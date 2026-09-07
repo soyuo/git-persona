@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { runGitCommand } from "../src/git.js";
+import { runGitCommand } from "../src/git/index.js";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)));
 const bin = join(root, "bin", "git-persona.js");
