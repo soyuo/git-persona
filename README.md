@@ -138,6 +138,18 @@ git persona logout work
 git persona credentials
 ```
 
+To open Git Credential Manager's GitHub login flow directly:
+
+```bash
+git credential-manager github login
+```
+
+After completing the GCM login flow, verify the registered accounts:
+
+```bash
+git credential-manager github list
+```
+
 If an account is already registered in Git Credential Manager, register the same GitHub ID as a persona before switching to it:
 
 ```bash

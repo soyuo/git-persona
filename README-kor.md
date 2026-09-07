@@ -138,6 +138,18 @@ git persona logout work
 git persona credentials
 ```
 
+Git Credential Manager의 GitHub 로그인 flow를 직접 실행하려면 다음 명령어를 사용합니다.
+
+```bash
+git credential-manager github login
+```
+
+GCM 로그인 후 등록된 계정을 확인합니다.
+
+```bash
+git credential-manager github list
+```
+
 Git Credential Manager에 계정이 이미 등록되어 있다면, 전환하기 전에 같은 GitHub ID를 persona로 등록해야 합니다.
 
 ```bash
