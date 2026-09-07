@@ -72,6 +72,8 @@
   "picker.help": "Use ↑/↓, j/k, Enter, Esc",
   "switch.empty": "no personas saved yet",
   "switch.cancelled": "Selection cancelled.",
+  "switch.credentialMissing": "GitHub credential for '{id}' was not found. Opening Git Credential Manager login.",
+  "switch.credentialUnavailable": "GitHub credential for '{id}' is still unavailable; SSH fallback remains available.",
   "switch.saved": "Switched {scope} persona to '{id}'.",
   "switch.authPreference": "Auth preference: HTTPS token, then SSH fallback.",
   "profile.exists": "persona '{id}' already exists",

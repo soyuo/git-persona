@@ -72,6 +72,8 @@
   "picker.help": "↑/↓, j/k로 이동, Enter로 선택, Esc로 취소",
   "switch.empty": "저장된 persona가 없습니다",
   "switch.cancelled": "선택을 취소했습니다.",
+  "switch.credentialMissing": "'{id}' GitHub credential을 찾을 수 없어 Git Credential Manager 로그인을 엽니다.",
+  "switch.credentialUnavailable": "'{id}' GitHub credential을 아직 사용할 수 없습니다. SSH fallback은 계속 사용할 수 있습니다.",
   "switch.saved": "{scope} persona를 '{id}'로 전환했습니다.",
   "switch.authPreference": "인증 우선순위: HTTPS token, 이후 SSH fallback.",
   "profile.exists": "persona '{id}'가 이미 존재합니다",

@@ -8,6 +8,8 @@ import {
   applyProfile,
   clearProfile,
   gitState,
+  githubAccounts,
+  loginGithubAccount,
   rewriteGithubRemotes,
   runGitCommand,
 } from "./git/index.js";
@@ -710,6 +712,32 @@ async function runSwitch(args, io) {
     if (!profile) {
       io.stdout.write(`${message(locale, "switch.cancelled")}\n`);
       return;
+    }
+  }
+
+  if (io.stdin?.isTTY && io.stdout?.isTTY) {
+    const username = profile.auth?.https?.username ?? profile.id;
+    let accounts;
+
+    try {
+      accounts = githubAccounts(state.cwd);
+    } catch {
+      accounts = new Set();
+    }
+
+    if (!accounts.has(username)) {
+      io.stdout.write(`${message(locale, "switch.credentialMissing", { id: username })}\n`);
+      loginGithubAccount(state.cwd);
+
+      try {
+        accounts = githubAccounts(state.cwd);
+      } catch {
+        accounts = new Set();
+      }
+
+      if (!accounts.has(username)) {
+        io.stderr.write(`${message(locale, "switch.credentialUnavailable", { id: username })}\n`);
+      }
     }
   }
 

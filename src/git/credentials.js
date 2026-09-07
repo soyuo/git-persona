@@ -62,6 +62,16 @@ export function githubAccounts(cwd = process.cwd()) {
   return new Set(result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
 }
 
+export function loginGithubAccount(cwd = process.cwd()) {
+  const result = spawnSync("git", ["credential-manager", "github", "login"], {
+    cwd,
+    stdio: "inherit",
+    windowsHide: false,
+  });
+
+  return result.status === 0;
+}
+
 export function githubState(cwd = process.cwd()) {
   return readGithubCredential(cwd);
 }
