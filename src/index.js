@@ -734,13 +734,18 @@ function runDoctor(args, io) {
     : null;
   const activeId = repoId ?? config.active.global;
   const profile = activeId ? config.profiles[activeId] : null;
-  let issues = 0;
+  let failures = 0;
+  let warnings = 0;
 
   const report = (status, label, detail) => {
     io.stdout.write(`[${status}] ${label}: ${detail}\n`);
 
-    if (status === "WARN" || status === "FAIL") {
-      issues += 1;
+    if (status === "WARN") {
+      warnings += 1;
+    }
+
+    if (status === "FAIL") {
+      failures += 1;
     }
   };
 
@@ -832,8 +837,21 @@ function runDoctor(args, io) {
     }
   }
 
-  if (issues > 0) {
-    io.stderr.write(`git-persona: doctor found ${issues} issue(s)\n`);
+  if (failures > 0 || warnings > 0) {
+    const summary = [];
+
+    if (failures > 0) {
+      summary.push(`${failures} issue(s)`);
+    }
+
+    if (warnings > 0) {
+      summary.push(`${warnings} warning(s)`);
+    }
+
+    io.stderr.write(`git-persona: doctor found ${summary.join(" and ")}\n`);
+  }
+
+  if (failures > 0) {
     io.exit(1);
   }
 }
