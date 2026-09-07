@@ -10,8 +10,10 @@ import {
   eraseGithubCredential,
   githubAccounts,
   gitState,
+  remoteUrls,
   rewriteGithubRemotes,
   runGitCommand,
+  sshAvailable,
   storeGithubCredential,
 } from "./git.js";
 
@@ -52,7 +54,6 @@ const plannedCommands = new Set([
   "login",
   "logout",
   "credentials",
-  "doctor",
 ]);
 
 function formatValue(value) {
@@ -710,6 +711,133 @@ function runCredentials(args, io) {
   }
 }
 
+function runDoctor(args, io) {
+  if (args.length > 0) {
+    io.stderr.write("git-persona: doctor takes no arguments\n");
+    io.exit(2);
+    return;
+  }
+
+  let config;
+
+  try {
+    config = load();
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  const state = gitState();
+  const repoId = state.isRepository
+    ? config.active.repositories[state.cwd] ?? null
+    : null;
+  const activeId = repoId ?? config.active.global;
+  const profile = activeId ? config.profiles[activeId] : null;
+  let issues = 0;
+
+  const report = (status, label, detail) => {
+    io.stdout.write(`[${status}] ${label}: ${detail}\n`);
+
+    if (status === "WARN" || status === "FAIL") {
+      issues += 1;
+    }
+  };
+
+  const git = runGitCommand(["--version"]);
+  report(git.ok ? " OK " : "FAIL", "Git", git.ok ? git.stdout : "not available");
+
+  const gcm = runGitCommand(["credential-manager", "--version"]);
+  report(
+    gcm.ok ? " OK " : "WARN",
+    "GCM",
+    gcm.ok ? gcm.stdout : "not available",
+  );
+
+  if (!activeId) {
+    report("WARN", "Active persona", "none selected");
+  } else if (!profile) {
+    report("FAIL", "Active persona", `'${activeId}' is missing from profiles`);
+  } else {
+    report(
+      " OK ",
+      "Active persona",
+      repoId ? `${activeId} (repo)` : `${activeId} (global)`,
+    );
+
+    const expected = {
+      "user.name": profile.git?.name,
+      "user.email": profile.git?.email,
+      "user.signingkey": profile.git?.signingKey,
+      "gpg.format": profile.git?.gpgFormat,
+      "commit.gpgsign": profile.git?.commitGpgSign,
+      "credential.helper": profile.git?.credentialHelper,
+      "credential.https://github.com.username": profile.auth?.https?.username ?? profile.id,
+    };
+    const mismatches = Object.entries(expected)
+      .filter(([key, value]) => value !== null && value !== undefined)
+      .filter(([key, value]) => state.effective[key] !== value)
+      .map(([key]) => key);
+
+    report(
+      mismatches.length === 0 ? " OK " : "WARN",
+      "Git config",
+      mismatches.length === 0 ? "matches active persona" : `mismatch: ${mismatches.join(", ")}`,
+    );
+
+    try {
+      const accounts = githubAccounts();
+      const username = profile.auth?.https?.username ?? profile.id;
+
+      report(
+        accounts.has(username) ? " OK " : "WARN",
+        "GitHub credential",
+        accounts.has(username) ? "stored" : "not found",
+      );
+    } catch (error) {
+      report("WARN", "GitHub credential", error.message);
+    }
+  }
+
+  report(
+    sshAvailable() ? " OK " : "WARN",
+    "SSH",
+    sshAvailable() ? "available" : "not available",
+  );
+
+  const signingKey = profile?.auth?.ssh?.signingKey ?? state.effective["user.signingkey"];
+  report(
+    signingKey ? " OK " : "WARN",
+    "Signing key",
+    signingKey ? "configured" : "not configured",
+  );
+
+  if (!state.isRepository) {
+    report(" OK ", "Remotes", "not checked outside a repository");
+  } else {
+    const remotes = remoteUrls(state.cwd);
+
+    if (remotes.length === 0) {
+      report("WARN", "Remotes", "none configured");
+    } else {
+      for (const remote of remotes) {
+        const supported = /github\.com[/:]/i.test(remote.url);
+
+        report(
+          supported ? " OK " : "WARN",
+          `Remote ${remote.name}`,
+          supported ? remote.url : "not a GitHub remote",
+        );
+      }
+    }
+  }
+
+  if (issues > 0) {
+    io.stderr.write(`git-persona: doctor found ${issues} issue(s)\n`);
+    io.exit(1);
+  }
+}
+
 function authFailure(result) {
   const message = `${result.stdout}\n${result.stderr}`.toLowerCase();
 
@@ -1128,6 +1256,11 @@ export async function run(args, io) {
 
   if (command === "run") {
     runGitWithFallback(commandArgs, io);
+    return;
+  }
+
+  if (command === "doctor") {
+    runDoctor(commandArgs, io);
     return;
   }
 

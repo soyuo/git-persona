@@ -87,6 +87,33 @@ export function runGitCommand(args, cwd = process.cwd()) {
   return runGit(args, { cwd });
 }
 
+export function sshAvailable() {
+  const result = spawnSync("ssh", ["-V"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+
+  return result.status === 0;
+}
+
+export function remoteUrls(cwd = process.cwd()) {
+  const remotes = runGit(["remote"], { cwd });
+
+  if (!remotes.ok) {
+    return [];
+  }
+
+  return remotes.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((name) => {
+      const result = runGit(["remote", "get-url", name], { cwd });
+
+      return result.ok ? { name, url: result.stdout } : null;
+    })
+    .filter(Boolean);
+}
+
 function sshUrl(url) {
   const match = url.match(/^https?:\/\/(?:[^@/]+@)?github\.com\/(.+)$/i);
 
