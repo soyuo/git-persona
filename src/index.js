@@ -16,6 +16,7 @@ import {
   sshAvailable,
   storeGithubCredential,
 } from "./git.js";
+import { aqua, blue, dim, green, red, yellow } from "./style.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
@@ -60,12 +61,12 @@ function formatValue(value) {
   return value ?? "(not set)";
 }
 
-function formatSelected(isSelected) {
-  return isSelected ? "◉" : "○";
+function formatSelected(isSelected, stream) {
+  return isSelected ? aqua("◉", stream) : dim("○", stream);
 }
 
 function writeConfigBlock(io, title, values) {
-  io.stdout.write(`${title}\n`);
+  io.stdout.write(`${blue(title, io.stdout)}\n`);
   io.stdout.write(`  user.name: ${formatValue(values["user.name"])}\n`);
   io.stdout.write(`  user.email: ${formatValue(values["user.email"])}\n`);
   io.stdout.write(`  user.signingkey: ${formatValue(values["user.signingkey"])}\n`);
@@ -85,7 +86,7 @@ function runCurrent(io) {
   const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
   const activeId = repoId ?? config.active.global;
 
-  io.stdout.write("Current Git state\n");
+  io.stdout.write(`${blue("Current Git state", io.stdout)}\n`);
   io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
   io.stdout.write(`Active persona: ${formatValue(activeId)}\n`);
 
@@ -265,7 +266,7 @@ async function runMigration(args, io) {
   const profileName = options.name ?? inferProfileName(state, values);
   const profile = migrationProfile(profileName, state, values);
 
-  io.stdout.write("Migration preview\n");
+  io.stdout.write(`${blue("Migration preview", io.stdout)}\n`);
   io.stdout.write(`Profile: ${profileName}\n`);
   io.stdout.write(`Scope: ${options.scope}\n`);
   io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
@@ -317,7 +318,7 @@ function runList(io) {
 
   const profiles = list(config);
 
-  io.stdout.write("Git personas\n");
+  io.stdout.write(`${blue("Git personas", io.stdout)}\n`);
   io.stdout.write(`Config: ${configPath()}\n\n`);
 
   if (profiles.length === 0) {
@@ -327,13 +328,14 @@ function runList(io) {
   }
 
   for (const profile of profiles) {
-    const marker = formatSelected(profile.id === config.active.global);
+    const marker = formatSelected(profile.id === config.active.global, io.stdout);
     const email = profile.git?.email ? ` <${profile.git.email}>` : "";
     const credential = profile.auth?.https?.username
       ? ` [https:${profile.auth.https.username}]`
       : "";
 
-    io.stdout.write(`${marker} ${profile.id}${email}${credential}\n`);
+    const id = profile.id === config.active.global ? aqua(profile.id, io.stdout) : profile.id;
+    io.stdout.write(`${marker} ${id}${email}${credential}\n`);
   }
 }
 
@@ -696,7 +698,7 @@ function runCredentials(args, io) {
     return;
   }
 
-  io.stdout.write("GitHub credentials\n");
+  io.stdout.write(`${blue("GitHub credentials", io.stdout)}\n`);
 
   if (saved.length === 0) {
     io.stdout.write("No personas saved yet.\n");
@@ -707,7 +709,8 @@ function runCredentials(args, io) {
     const username = profileUsername(profile);
     const found = accounts.has(username);
 
-    io.stdout.write(`  ${profile.id}: ${found ? "stored" : "not found"}\n`);
+    const status = found ? green("stored", io.stdout) : yellow("not found", io.stdout);
+    io.stdout.write(`  ${profile.id}: ${status}\n`);
   }
 }
 
@@ -738,7 +741,13 @@ function runDoctor(args, io) {
   let warnings = 0;
 
   const report = (status, label, detail) => {
-    io.stdout.write(`[${status}] ${label}: ${detail}\n`);
+    const tag =
+      status === "FAIL"
+        ? red(`[${status}]`, io.stdout)
+        : status === "WARN"
+          ? yellow(`[${status}]`, io.stdout)
+          : green(`[${status}]`, io.stdout);
+    io.stdout.write(`${tag} ${label}: ${detail}\n`);
 
     if (status === "WARN") {
       warnings += 1;
@@ -1045,14 +1054,16 @@ function runRepo(args, io) {
 
 function renderPicker(io, profiles, index) {
   io.stdout.write("\x1b[2J\x1b[H");
-  io.stdout.write("Select persona\n\n");
+  io.stdout.write(`${blue("Select persona", io.stdout)}\n\n`);
 
   for (let i = 0; i < profiles.length; i += 1) {
     const profile = profiles[i];
     const email = profile.git?.email ? ` <${profile.git.email}>` : "";
     const cred = profile.auth?.https?.username ? ` [https:${profile.auth.https.username}]` : "";
 
-    io.stdout.write(`${formatSelected(i === index)} ${profile.id}${email}${cred}\n`);
+    const selected = i === index;
+    const id = selected ? aqua(profile.id, io.stdout) : profile.id;
+    io.stdout.write(`${formatSelected(selected, io.stdout)} ${id}${email}${cred}\n`);
   }
 
   io.stdout.write("\nUse \u2191/\u2193, j/k, Enter, Esc\n");
