@@ -9,6 +9,22 @@ import {
 import { green, red, yellow } from "../style.js";
 import { currentLocale, localeOf, message } from "../langs/index.js";
 
+function displayWidth(value) {
+  return Array.from(value).reduce((width, char) => {
+    return width + (/[ᄀ-ᅟ〈〉⺀-〾぀-꓏가-힣豈-﫿︐-︙︰-﹯ﹰ-﻿]/u.test(char) ? 2 : 1);
+  }, 0);
+}
+
+function padDisplay(value, width) {
+  return `${value}${" ".repeat(Math.max(0, width - displayWidth(value)))}`;
+}
+
+function centerDisplay(value, width) {
+  const padding = Math.max(0, width - displayWidth(value));
+  const left = Math.floor(padding / 2);
+  return `${" ".repeat(left)}${value}${" ".repeat(padding - left)}`;
+}
+
 export function runCheck(args, io) {
   if (args.length > 0) {
     io.stderr.write(`git-persona: ${message(currentLocale(), "check.invalidArgs")}\n`);
@@ -33,16 +49,36 @@ export function runCheck(args, io) {
   const profile = activeId ? config.profiles[activeId] : null;
   let failures = 0;
   let warnings = 0;
+  const labels = [
+    "check.git",
+    "check.gcm",
+    "check.active",
+    "check.config",
+    "check.credential",
+    "check.ssh",
+    "check.signingKey",
+    "check.remotes",
+  ].map((key) => message(locale, key));
+  const labelWidth = Math.max(
+    ...labels.map(displayWidth),
+    displayWidth("Remote origin"),
+  );
+  const statusWidth = Math.max(
+    ...["status.ok", "status.warn", "status.fail"].map((key) =>
+      displayWidth(message(locale, key)),
+    ),
+  );
 
   const report = (status, label, detail) => {
     const key = status.trim().toLowerCase() === "fail" ? "status.fail" : status.trim().toLowerCase() === "warn" ? "status.warn" : "status.ok";
     const statusLabel = message(locale, key);
+    const rawTag = `[${centerDisplay(statusLabel, statusWidth)}]`;
     const tag = status === "FAIL"
-      ? red(`[${statusLabel}]`, io.stdout)
+      ? red(rawTag, io.stdout)
       : status === "WARN"
-        ? yellow(`[${statusLabel}]`, io.stdout)
-        : green(`[${statusLabel}]`, io.stdout);
-    io.stdout.write(`${tag} ${label}: ${detail}\n`);
+        ? yellow(rawTag, io.stdout)
+        : green(rawTag, io.stdout);
+    io.stdout.write(`${tag} ${padDisplay(label, labelWidth)}: ${detail}\n`);
 
     if (status === "WARN") warnings += 1;
     if (status === "FAIL") failures += 1;
