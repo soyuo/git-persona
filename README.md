@@ -11,7 +11,26 @@ Switch Git identities and GitHub credentials without logging out.
 
 ## Installation
 
-Run the CLI from this repository:
+Register this repository's CLI binary in the global npm PATH:
+
+```bash
+npm link
+```
+
+Then verify that the command is available:
+
+```bash
+git-persona --help
+git persona --help
+```
+
+`npm link` creates a global link to this working copy, so changes made here are immediately reflected when the CLI runs. To remove the link later:
+
+```bash
+npm unlink --global git-persona
+```
+
+You can also run the CLI directly from this repository without linking:
 
 ```bash
 npm start -- --help
