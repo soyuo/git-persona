@@ -15,7 +15,7 @@ import {
   runGitCommand,
   sshAvailable,
   storeGithubCredential,
-} from "./git.js";
+} from "./git/index.js";
 import { aqua, blue, dim, green, red, yellow } from "./style.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
