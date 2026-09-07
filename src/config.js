@@ -10,6 +10,8 @@ export function emptyConfig() {
     active: {
       global: null,
       repositories: {},
+      language: "en-US",
+      repositoryLanguages: {},
     },
     profiles: {},
   };

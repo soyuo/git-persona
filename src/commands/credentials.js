@@ -5,6 +5,7 @@ import {
   storeGithubCredential,
 } from "../git/index.js";
 import { blue, green, yellow } from "../style.js";
+import { currentLocale, localeOf, message } from "../langs/index.js";
 
 function parseId(args, action) {
   if (args.length !== 1 || !args[0] || args[0].startsWith("--")) {
@@ -71,12 +72,13 @@ function username(profile) {
 }
 
 export async function runLogin(args, io) {
+  const locale = currentLocale();
   let id;
 
   try {
     id = parseId(args, "login");
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(2);
     return;
   }
@@ -85,12 +87,12 @@ export async function runLogin(args, io) {
   const profile = config.profiles[id];
 
   if (!profile) {
-    io.stderr.write(`git-persona: persona '${id}' does not exist\n`);
+    io.stderr.write(`git-persona: ${message(locale, "profile.missing", { id })}\n`);
     io.exit(1);
     return;
   }
 
-  io.stdout.write(`Token for '${id}' (input hidden): `);
+  io.stdout.write(message(locale, "credentials.tokenPrompt", { id }));
 
   let token;
 
@@ -112,23 +114,24 @@ export async function runLogin(args, io) {
     };
     save(config);
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(1);
     return;
   } finally {
     token = null;
   }
 
-  io.stdout.write(`${green(`Stored GitHub credential for '${id}'.`, io.stdout)}\n`);
+  io.stdout.write(`${green(message(locale, "credentials.saved", { id }), io.stdout)}\n`);
 }
 
 export function runLogout(args, io) {
+  const locale = currentLocale();
   let id;
 
   try {
     id = parseId(args, "logout");
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(2);
     return;
   }
@@ -137,7 +140,7 @@ export function runLogout(args, io) {
   const profile = config.profiles[id];
 
   if (!profile) {
-    io.stderr.write(`git-persona: persona '${id}' does not exist\n`);
+    io.stderr.write(`git-persona: ${message(locale, "profile.missing", { id })}\n`);
     io.exit(1);
     return;
   }
@@ -154,17 +157,18 @@ export function runLogout(args, io) {
     };
     save(config);
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(1);
     return;
   }
 
-  io.stdout.write(`${green(`Removed GitHub credential for '${id}'.`, io.stdout)}\n`);
+  io.stdout.write(`${green(message(locale, "credentials.removed", { id }), io.stdout)}\n`);
 }
 
 export function runCredentials(args, io) {
+  const locale = currentLocale();
   if (args.length > 0) {
-    io.stderr.write("git-persona: credentials takes no arguments\n");
+    io.stderr.write(`git-persona: ${message(locale, "credentials.invalidArgs")}\n`);
     io.exit(2);
     return;
   }
@@ -181,16 +185,16 @@ export function runCredentials(args, io) {
     return;
   }
 
-  io.stdout.write(`${blue("GitHub credentials", io.stdout)}\n`);
+  io.stdout.write(`${blue(message(locale, "credentials.title"), io.stdout)}\n`);
 
   if (saved.length === 0) {
-    io.stdout.write("No personas saved yet.\n");
+    io.stdout.write(`${message(locale, "credentials.empty")}\n`);
     return;
   }
 
   for (const profile of saved) {
     const found = accounts.has(username(profile));
-    const status = found ? green("stored", io.stdout) : yellow("not found", io.stdout);
+    const status = found ? green(message(locale, "credentials.stored"), io.stdout) : yellow(message(locale, "credentials.notFound"), io.stdout);
 
     io.stdout.write(`  ${profile.id}: ${status}\n`);
   }

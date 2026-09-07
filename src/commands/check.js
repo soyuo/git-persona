@@ -7,10 +7,11 @@ import {
   sshAvailable,
 } from "../git/index.js";
 import { green, red, yellow } from "../style.js";
+import { currentLocale, localeOf, message } from "../langs/index.js";
 
 export function runCheck(args, io) {
   if (args.length > 0) {
-    io.stderr.write("git-persona: check takes no arguments\n");
+    io.stderr.write(`git-persona: ${message(currentLocale(), "check.invalidArgs")}\n`);
     io.exit(2);
     return;
   }
@@ -26,6 +27,7 @@ export function runCheck(args, io) {
   }
 
   const state = gitState();
+  const locale = localeOf(config, state.cwd);
   const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
   const activeId = repoId ?? config.active.global;
   const profile = activeId ? config.profiles[activeId] : null;
@@ -33,11 +35,13 @@ export function runCheck(args, io) {
   let warnings = 0;
 
   const report = (status, label, detail) => {
+    const key = status.trim().toLowerCase() === "fail" ? "status.fail" : status.trim().toLowerCase() === "warn" ? "status.warn" : "status.ok";
+    const statusLabel = message(locale, key);
     const tag = status === "FAIL"
-      ? red(`[${status}]`, io.stdout)
+      ? red(`[${statusLabel}]`, io.stdout)
       : status === "WARN"
-        ? yellow(`[${status}]`, io.stdout)
-        : green(`[${status}]`, io.stdout);
+        ? yellow(`[${statusLabel}]`, io.stdout)
+        : green(`[${statusLabel}]`, io.stdout);
     io.stdout.write(`${tag} ${label}: ${detail}\n`);
 
     if (status === "WARN") warnings += 1;
@@ -45,17 +49,17 @@ export function runCheck(args, io) {
   };
 
   const git = runGitCommand(["--version"]);
-  report(git.ok ? " OK " : "FAIL", "Git", git.ok ? git.stdout : "not available");
+  report(git.ok ? " OK " : "FAIL", message(locale, "check.git"), git.ok ? git.stdout : message(locale, "check.notAvailable"));
 
   const gcm = runGitCommand(["credential-manager", "--version"]);
-  report(gcm.ok ? " OK " : "WARN", "GCM", gcm.ok ? gcm.stdout : "not available");
+  report(gcm.ok ? " OK " : "WARN", message(locale, "check.gcm"), gcm.ok ? gcm.stdout : message(locale, "check.notAvailable"));
 
   if (!activeId) {
-    report("WARN", "Active persona", "none selected");
+    report("WARN", message(locale, "check.active"), message(locale, "check.none"));
   } else if (!profile) {
-    report("FAIL", "Active persona", `'${activeId}' is missing from profiles`);
+    report("FAIL", message(locale, "check.active"), message(locale, "check.missingProfile", { id: activeId }));
   } else {
-    report(" OK ", "Active persona", repoId ? `${activeId} (repo)` : `${activeId} (global)`);
+    report(" OK ", message(locale, "check.active"), repoId ? `${activeId} (repo)` : `${activeId} (global)`);
 
     const expected = {
       "user.name": profile.git?.name,
@@ -73,45 +77,45 @@ export function runCheck(args, io) {
 
     report(
       mismatches.length === 0 ? " OK " : "WARN",
-      "Git config",
-      mismatches.length === 0 ? "matches active persona" : `mismatch: ${mismatches.join(", ")}`,
+      message(locale, "check.config"),
+      mismatches.length === 0 ? message(locale, "check.matches") : `${message(locale, "check.mismatch")}: ${mismatches.join(", ")}`,
     );
 
     try {
       const accounts = githubAccounts();
       const username = profile.auth?.https?.username ?? profile.id;
-      report(accounts.has(username) ? " OK " : "WARN", "GitHub credential", accounts.has(username) ? "stored" : "not found");
+      report(accounts.has(username) ? " OK " : "WARN", message(locale, "check.credential"), accounts.has(username) ? message(locale, "check.stored") : message(locale, "check.notFound"));
     } catch (error) {
-      report("WARN", "GitHub credential", error.message);
+      report("WARN", message(locale, "check.credential"), error.message);
     }
   }
 
   const ssh = sshAvailable();
-  report(ssh ? " OK " : "WARN", "SSH", ssh ? "available" : "not available");
+  report(ssh ? " OK " : "WARN", message(locale, "check.ssh"), ssh ? message(locale, "check.available") : message(locale, "check.notAvailable"));
 
   const signingKey = profile?.auth?.ssh?.signingKey ?? state.effective["user.signingkey"];
-  report(signingKey ? " OK " : "WARN", "Signing key", signingKey ? "configured" : "not configured");
+  report(signingKey ? " OK " : "WARN", message(locale, "check.signingKey"), signingKey ? message(locale, "check.configured") : message(locale, "check.notConfigured"));
 
   if (!state.isRepository) {
-    report(" OK ", "Remotes", "not checked outside a repository");
+    report(" OK ", message(locale, "check.remotes"), message(locale, "check.outsideRepo"));
   } else {
     const remotes = remoteUrls(state.cwd);
 
     if (remotes.length === 0) {
-      report("WARN", "Remotes", "none configured");
+      report("WARN", message(locale, "check.remotes"), message(locale, "check.noRemotes"));
     } else {
       for (const remote of remotes) {
         const supported = /github\.com[/:]/i.test(remote.url);
-        report(supported ? " OK " : "WARN", `Remote ${remote.name}`, supported ? remote.url : "not a GitHub remote");
+        report(supported ? " OK " : "WARN", `Remote ${remote.name}`, supported ? remote.url : message(locale, "check.notGithub"));
       }
     }
   }
 
   if (failures > 0 || warnings > 0) {
     const summary = [];
-    if (failures > 0) summary.push(`${failures} issue(s)`);
-    if (warnings > 0) summary.push(`${warnings} warning(s)`);
-    io.stderr.write(`git-persona: check found ${summary.join(" and ")}\n`);
+    if (failures > 0) summary.push(`${failures} ${message(locale, "check.issues")}`);
+    if (warnings > 0) summary.push(`${warnings} ${message(locale, "check.warnings")}`);
+    io.stderr.write(`git-persona: ${message(locale, "check.summary", { summary: summary.join(` ${message(locale, "check.and")} `) })}\n`);
   }
 
   if (failures > 0) io.exit(1);

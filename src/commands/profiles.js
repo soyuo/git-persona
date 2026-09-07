@@ -1,4 +1,5 @@
 import { load, save } from "../config.js";
+import { currentLocale, message } from "../langs/index.js";
 
 const fields = new Map([
   ["--name", "name"],
@@ -95,6 +96,7 @@ function updateProfile(profile, values) {
 }
 
 export function runProfileCommand(action, args, io) {
+  const locale = currentLocale();
   let options;
 
   try {
@@ -111,7 +113,7 @@ export function runProfileCommand(action, args, io) {
       throw new Error("remove takes only a persona id");
     }
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(2);
     return;
   }
@@ -121,7 +123,7 @@ export function runProfileCommand(action, args, io) {
   try {
     config = load();
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(1);
     return;
   }
@@ -130,7 +132,7 @@ export function runProfileCommand(action, args, io) {
 
   if (action === "add") {
     if (current) {
-      io.stderr.write(`git-persona: persona '${options.id}' already exists\n`);
+      io.stderr.write(`git-persona: ${message(locale, "profile.exists", { id: options.id })}\n`);
       io.exit(1);
       return;
     }
@@ -140,7 +142,7 @@ export function runProfileCommand(action, args, io) {
 
   if (action === "edit") {
     if (!current) {
-      io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+      io.stderr.write(`git-persona: ${message(locale, "profile.missing", { id: options.id })}\n`);
       io.exit(1);
       return;
     }
@@ -153,14 +155,14 @@ export function runProfileCommand(action, args, io) {
     const active = config.active.global === options.id || bound;
 
     if (!current) {
-      io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+      io.stderr.write(`git-persona: ${message(locale, "profile.missing", { id: options.id })}\n`);
       io.exit(1);
       return;
     }
 
     if (active) {
       io.stderr.write(
-        `git-persona: persona '${options.id}' is active; switch to another persona before removing it\n`,
+        `git-persona: ${message(locale, "profile.active", { id: options.id })}\n`,
       );
       io.exit(1);
       return;
@@ -172,14 +174,14 @@ export function runProfileCommand(action, args, io) {
   try {
     save(config);
   } catch (error) {
-    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "error.prefix", { error: error.message })}\n`);
     io.exit(1);
     return;
   }
 
   io.stdout.write(
     action === "remove"
-      ? `Removed persona '${options.id}'.\n`
-      : `${action === "add" ? "Added" : "Updated"} persona '${options.id}'.\n`,
+      ? `${message(locale, "profile.removed", { id: options.id })}\n`
+      : `${message(locale, action === "add" ? "profile.added" : "profile.updated", { id: options.id })}\n`,
   );
 }

@@ -12,12 +12,14 @@ import {
   runGitCommand,
 } from "./git/index.js";
 import { aqua, blue, dim, green } from "./style.js";
+import { currentLocale, localeOf, message } from "./langs/index.js";
 import {
   runCredentials,
   runCheck,
   runLogin,
   runLogout,
   runProfileCommand,
+  runLang,
 } from "./commands/index.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -25,7 +27,29 @@ const packageJson = JSON.parse(
   readFileSync(join(packageDir, "package.json"), "utf8"),
 );
 
-const helpText = `git-persona ${packageJson.version}
+function helpText(locale) {
+  return [
+    message(locale, "help.title", { version: packageJson.version }),
+    "",
+    message(locale, "help.description"),
+    "",
+    message(locale, "help.usage"),
+    message(locale, "help.gitCommand"),
+    message(locale, "help.binaryCommand"),
+    "",
+    message(locale, "help.commands"),
+    ...["migration", "current", "list", "switch", "add", "edit", "remove", "login", "logout", "credentials", "repo", "run", "check", "lang"]
+      .map((command) => message(locale, `help.${command}`)),
+    "",
+    message(locale, "help.options"),
+    message(locale, "help.help"),
+    message(locale, "help.version"),
+    "",
+  ].join("\n");
+}
+
+/*
+git-persona ${packageJson.version}
 
 Switch Git identities, credentials, tokens, and SSH profiles without logging out.
 
@@ -47,11 +71,13 @@ Commands:
   repo             Manage repository persona bindings
   run <git-command> Run a Git command with SSH fallback
   check            Check Git, credentials, SSH, and persona state
+  lang <locale>    Set global or repository language
 
 Options:
   -h, --help       Show this help
   -v, --version    Show the version
 `;
+*/
 
 const plannedCommands = new Set([
   "login",
@@ -67,42 +93,44 @@ function formatSelected(isSelected, stream) {
   return isSelected ? aqua("◉", stream) : dim("○", stream);
 }
 
-function writeConfigBlock(io, title, values) {
+function writeConfigBlock(io, title, values, locale) {
   io.stdout.write(`${blue(title, io.stdout)}\n`);
-  io.stdout.write(`  user.name: ${formatValue(values["user.name"])}\n`);
-  io.stdout.write(`  user.email: ${formatValue(values["user.email"])}\n`);
-  io.stdout.write(`  user.signingkey: ${formatValue(values["user.signingkey"])}\n`);
-  io.stdout.write(`  gpg.format: ${formatValue(values["gpg.format"])}\n`);
-  io.stdout.write(`  commit.gpgsign: ${formatValue(values["commit.gpgsign"])}\n`);
-  io.stdout.write(
-    `  credential.helper: ${formatValue(values["credential.helper"])}\n`,
-  );
-  io.stdout.write(
-    `  github credential user: ${formatValue(values["credential.https://github.com.username"])}\n`,
-  );
+  const fields = [
+    ["config.userName", "user.name"],
+    ["config.userEmail", "user.email"],
+    ["config.signingKey", "user.signingkey"],
+    ["config.gpgFormat", "gpg.format"],
+    ["config.gpgSign", "commit.gpgsign"],
+    ["config.credentialHelper", "credential.helper"],
+    ["config.githubUser", "credential.https://github.com.username"],
+  ];
+  for (const [key, field] of fields) {
+    io.stdout.write(`${message(locale, key, { value: formatValue(values[field]) })}\n`);
+  }
 }
 
 function runCurrent(io) {
   const state = gitState();
   const config = load();
+  const locale = localeOf(config, state.cwd);
   const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
   const activeId = repoId ?? config.active.global;
 
-  io.stdout.write(`${blue("Current Git state", io.stdout)}\n`);
-  io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
-  io.stdout.write(`Active persona: ${formatValue(activeId)}\n`);
+  io.stdout.write(`${blue(message(locale, "current.title"), io.stdout)}\n`);
+  io.stdout.write(`${message(locale, "current.repository", { value: state.isRepository ? "yes" : "no" })}\n\n`);
+  io.stdout.write(`${message(locale, "current.active", { value: formatValue(activeId) })}\n`);
 
   if (repoId) {
-    io.stdout.write(`Repo binding: ${repoId}\n`);
+    io.stdout.write(`${message(locale, "current.binding", { id: repoId })}\n`);
   }
 
   io.stdout.write("\n");
 
-  writeConfigBlock(io, "Global config:", state.global);
+  writeConfigBlock(io, message(locale, "config.global"), state.global, locale);
 
   if (state.local) {
     io.stdout.write("\n");
-    writeConfigBlock(io, "Local config:", state.local);
+    writeConfigBlock(io, message(locale, "config.local"), state.local, locale);
   }
 }
 
@@ -216,7 +244,7 @@ function migrationProfile(name, state, values) {
 }
 
 async function confirmMigration(io) {
-  io.stdout.write("Apply this migration? [y/N] ");
+  io.stdout.write(`${message(currentLocale(), "migration.confirm")}`);
 
   if (!io.stdin?.isTTY) {
     const input = readFileSync(io.stdin?.fd ?? 0, "utf8").trim().toLowerCase();
@@ -268,30 +296,31 @@ async function runMigration(args, io) {
   const profileName = options.name ?? inferProfileName(state, values);
   const profile = migrationProfile(profileName, state, values);
 
-  io.stdout.write(`${blue("Migration preview", io.stdout)}\n`);
-  io.stdout.write(`Profile: ${profileName}\n`);
-  io.stdout.write(`Scope: ${options.scope}\n`);
-  io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
-  writeConfigBlock(io, "Detected Git config:", values);
+  const locale = localeOf(load(), state.cwd);
+  io.stdout.write(`${blue(message(locale, "migration.preview"), io.stdout)}\n`);
+  io.stdout.write(`${message(locale, "migration.profile", { id: profileName })}\n`);
+  io.stdout.write(`${message(locale, "migration.scope", { scope: options.scope })}\n`);
+  io.stdout.write(`${message(locale, "migration.repository", { value: state.isRepository ? "yes" : "no" })}\n\n`);
+  writeConfigBlock(io, message(locale, "migration.detectedConfig"), values, locale);
   io.stdout.write("\n");
-  io.stdout.write("Detected GitHub credential:\n");
+  io.stdout.write(`${message(locale, "migration.detectedCredential")}\n`);
   io.stdout.write(
-    `  status: ${state.githubCredential.found ? "found" : "not found"}\n`,
+    `${message(locale, "migration.credentialStatus", { value: state.githubCredential.found ? "found" : "not found" })}\n`,
   );
   io.stdout.write(
-    `  github id: ${formatValue(state.githubCredential.username)}\n`,
+    `${message(locale, "migration.githubId", { value: formatValue(state.githubCredential.username) })}\n`,
   );
-  io.stdout.write("  token: (hidden)\n\n");
+  io.stdout.write(`${message(locale, "migration.tokenHidden")}\n\n`);
 
   if (options.dryRun) {
-    io.stdout.write("No files were changed because --dry-run was used.\n");
+    io.stdout.write(`${message(locale, "migration.dryRun")}\n`);
     return;
   }
 
   const confirmed = await confirmMigration(io);
 
   if (!confirmed) {
-    io.stdout.write("Migration cancelled.\n");
+    io.stdout.write(`${message(locale, "migration.cancelled")}\n`);
     return;
   }
 
@@ -303,8 +332,8 @@ async function runMigration(args, io) {
     return;
   }
 
-  io.stdout.write(`Saved persona '${profileName}'.\n`);
-  io.stdout.write(`Config: ${configPath()}\n`);
+  io.stdout.write(`${message(locale, "migration.saved", { id: profileName })}\n`);
+  io.stdout.write(`${message(locale, "config.path", { path: configPath() })}\n`);
 }
 
 function runList(io) {
@@ -319,13 +348,14 @@ function runList(io) {
   }
 
   const profiles = list(config);
+  const locale = localeOf(config);
 
-  io.stdout.write(`${blue("Git personas", io.stdout)}\n`);
-  io.stdout.write(`Config: ${configPath()}\n\n`);
+  io.stdout.write(`${blue(message(locale, "list.title"), io.stdout)}\n`);
+  io.stdout.write(`${message(locale, "config.path", { path: configPath() })}\n\n`);
 
   if (profiles.length === 0) {
-    io.stdout.write("No personas saved yet.\n");
-    io.stdout.write("Run `git persona migration --dry-run` to preview the current Git account.\n");
+    io.stdout.write(`${message(locale, "list.empty")}\n`);
+    io.stdout.write(`${message(locale, "list.migrationHint")}\n`);
     return;
   }
 
@@ -370,8 +400,9 @@ function activeId(config, state) {
 }
 
 function runGitWithFallback(args, io) {
+  const locale = currentLocale();
   if (args.length === 0) {
-    io.stderr.write("git-persona: run requires a Git command\n");
+    io.stderr.write(`git-persona: ${message(locale, "run.requiresCommand")}\n`);
     io.exit(2);
     return;
   }
@@ -394,19 +425,19 @@ function runGitWithFallback(args, io) {
     changed = rewriteGithubRemotes();
   } catch (error) {
     writeGitResult(io, first);
-    io.stderr.write(`git-persona: SSH fallback could not update remotes: ${error.message}\n`);
+    io.stderr.write(`git-persona: ${message(locale, "run.rewriteFailed", { error: error.message })}\n`);
     io.exit(first.status ?? 1);
     return;
   }
 
   if (changed.length === 0) {
     writeGitResult(io, first);
-    io.stderr.write("git-persona: no GitHub HTTPS remote was available for SSH fallback\n");
+    io.stderr.write(`git-persona: ${message(locale, "run.noRemote")}\n`);
     io.exit(first.status ?? 1);
     return;
   }
 
-  io.stderr.write("git-persona: HTTPS authentication failed; switched GitHub remotes to SSH and retrying\n");
+  io.stderr.write(`git-persona: ${message(locale, "run.retry")}\n`);
 
   const retry = runGitCommand(args);
   writeGitResult(io, retry);
@@ -419,7 +450,7 @@ function runGitWithFallback(args, io) {
   const id = activeId(config, gitState());
   const login = id ? `git persona login ${id}` : "git persona login <id>";
 
-  io.stderr.write(`git-persona: SSH authentication failed; run '${login}'\n`);
+  io.stderr.write(`git-persona: ${message(locale, "run.sshFailed", { login })}\n`);
   io.exit(retry.status ?? 1);
 }
 
@@ -458,6 +489,7 @@ function parseRepoArgs(args) {
 }
 
 function runRepo(args, io) {
+  const locale = currentLocale();
   let options;
 
   try {
@@ -469,7 +501,7 @@ function runRepo(args, io) {
   }
 
   if (!options.action) {
-    io.stderr.write("git-persona: use `repo bind <id>` or `repo unbind`\n");
+    io.stderr.write(`git-persona: ${message(locale, "repo.usage")}\n`);
     io.exit(2);
     return;
   }
@@ -477,7 +509,7 @@ function runRepo(args, io) {
   const state = gitState();
 
   if (!state.isRepository) {
-    io.stderr.write("git-persona: repo commands require a Git repository\n");
+    io.stderr.write(`git-persona: ${message(locale, "repo.requiresRepo")}\n`);
     io.exit(1);
     return;
   }
@@ -496,7 +528,7 @@ function runRepo(args, io) {
     const profile = config.profiles[options.id];
 
     if (!profile) {
-      io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+      io.stderr.write(`git-persona: ${message(locale, "profile.missing", { id: options.id })}\n`);
       io.exit(1);
       return;
     }
@@ -511,7 +543,7 @@ function runRepo(args, io) {
       return;
     }
 
-    io.stdout.write(`Bound this repo to '${profile.id}'.\n`);
+    io.stdout.write(`${message(locale, "repo.bound", { id: profile.id })}\n`);
     return;
   }
 
@@ -525,12 +557,13 @@ function runRepo(args, io) {
     return;
   }
 
-  io.stdout.write("Removed repo binding.\n");
+  io.stdout.write(`${message(locale, "repo.unbound")}\n`);
 }
 
 function renderPicker(io, profiles, index) {
+  const locale = currentLocale();
   io.stdout.write("\x1b[2J\x1b[H");
-  io.stdout.write(`${blue("Select persona", io.stdout)}\n\n`);
+  io.stdout.write(`${blue(message(locale, "picker.title"), io.stdout)}\n\n`);
 
   for (let i = 0; i < profiles.length; i += 1) {
     const profile = profiles[i];
@@ -542,7 +575,7 @@ function renderPicker(io, profiles, index) {
     io.stdout.write(`${formatSelected(selected, io.stdout)} ${id}${email}${cred}\n`);
   }
 
-  io.stdout.write("\nUse \u2191/\u2193, j/k, Enter, Esc\n");
+  io.stdout.write(`\n${message(locale, "picker.help")}\n`);
 }
 
 async function chooseProfile(io, profiles, startIndex) {
@@ -616,6 +649,7 @@ async function chooseProfile(io, profiles, startIndex) {
 }
 
 async function runSwitch(args, io) {
+  const locale = currentLocale();
   let options;
 
   try {
@@ -640,7 +674,7 @@ async function runSwitch(args, io) {
   const profiles = list(config);
 
   if (profiles.length === 0) {
-    io.stderr.write("git-persona: no personas saved yet\n");
+    io.stderr.write(`git-persona: ${message(locale, "switch.empty")}\n`);
     io.exit(1);
     return;
   }
@@ -672,7 +706,7 @@ async function runSwitch(args, io) {
     }
 
     if (!profile) {
-      io.stdout.write("Selection cancelled.\n");
+      io.stdout.write(`${message(locale, "switch.cancelled")}\n`);
       return;
     }
   }
@@ -697,15 +731,15 @@ async function runSwitch(args, io) {
     return;
   }
 
-  io.stdout.write(`Switched ${options.scope} persona to '${profile.id}'.\n`);
-  io.stdout.write("Auth preference: HTTPS token, then SSH fallback.\n");
+  io.stdout.write(`${message(locale, "switch.saved", { scope: options.scope, id: profile.id })}\n`);
+  io.stdout.write(`${message(locale, "switch.authPreference")}\n`);
 }
 
 export async function run(args, io) {
   const [command, ...commandArgs] = args;
 
   if (!command || command === "-h" || command === "--help") {
-    io.stdout.write(helpText);
+    io.stdout.write(helpText(currentLocale()));
     return;
   }
 
@@ -769,15 +803,19 @@ export async function run(args, io) {
     return;
   }
 
+  if (command === "lang") {
+    runLang(commandArgs, io);
+    return;
+  }
+
   if (plannedCommands.has(command)) {
-    io.stderr.write(
-      `git-persona: '${command}' is planned but not implemented yet.\n`,
-    );
+    io.stderr.write(`git-persona: ${message(currentLocale(), "error.planned", { command })}\n`);
     io.exit(2);
     return;
   }
 
-  io.stderr.write(`git-persona: unknown command '${command}'\n\n`);
-  io.stderr.write(helpText);
+  const locale = currentLocale();
+  io.stderr.write(`git-persona: ${message(locale, "error.unknownCommand", { command })}\n\n`);
+  io.stderr.write(helpText(locale));
   io.exit(2);
 }
