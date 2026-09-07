@@ -74,6 +74,17 @@ export function applyGitProfile(profile, scope, cwd = process.cwd()) {
   writeConfigValue("credential.helper", git.credentialHelper, configScope, cwd);
 }
 
+export function clearGitProfile(scope, cwd = process.cwd()) {
+  const configScope = scope === "repo" ? "local" : "global";
+
+  writeConfigValue("user.name", null, configScope, cwd);
+  writeConfigValue("user.email", null, configScope, cwd);
+  writeConfigValue("user.signingkey", null, configScope, cwd);
+  writeConfigValue("gpg.format", null, configScope, cwd);
+  writeConfigValue("commit.gpgsign", null, configScope, cwd);
+  writeConfigValue("credential.helper", null, configScope, cwd);
+}
+
 function readGithubCredential(cwd) {
   const result = spawnSync("git", ["credential-manager", "get"], {
     cwd,

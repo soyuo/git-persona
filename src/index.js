@@ -4,7 +4,7 @@ import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { getConfigPath, listProfiles, loadConfig, saveConfig } from "./config.js";
-import { applyGitProfile, getCurrentGitState } from "./git.js";
+import { applyGitProfile, clearGitProfile, getCurrentGitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
@@ -45,7 +45,6 @@ const plannedCommands = new Set([
   "login",
   "logout",
   "credentials",
-  "repo",
   "doctor",
 ]);
 
@@ -71,9 +70,19 @@ function writeConfigBlock(io, title, values) {
 
 function runCurrent(io) {
   const state = getCurrentGitState();
+  const config = loadConfig();
+  const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
+  const activeId = repoId ?? config.active.global;
 
   io.stdout.write("Current Git state\n");
   io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
+  io.stdout.write(`Active persona: ${formatValue(activeId)}\n`);
+
+  if (repoId) {
+    io.stdout.write(`Repo binding: ${repoId}\n`);
+  }
+
+  io.stdout.write("\n");
 
   writeConfigBlock(io, "Global config:", state.global);
 
@@ -317,6 +326,111 @@ function runList(io) {
   }
 }
 
+function parseRepoArgs(args) {
+  const options = {
+    action: null,
+    id: null,
+  };
+
+  const [action, id] = args;
+
+  if (!action) {
+    return options;
+  }
+
+  if (action === "bind") {
+    if (!id || id.startsWith("--")) {
+      throw new Error("repo bind requires a persona id");
+    }
+
+    options.action = "bind";
+    options.id = id;
+    return options;
+  }
+
+  if (action === "unbind") {
+    if (id) {
+      throw new Error("repo unbind takes no extra arguments");
+    }
+
+    options.action = "unbind";
+    return options;
+  }
+
+  throw new Error(`unknown repo action '${action}'`);
+}
+
+function runRepo(args, io) {
+  let options;
+
+  try {
+    options = parseRepoArgs(args);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(2);
+    return;
+  }
+
+  if (!options.action) {
+    io.stderr.write("git-persona: use `repo bind <id>` or `repo unbind`\n");
+    io.exit(2);
+    return;
+  }
+
+  const state = getCurrentGitState();
+
+  if (!state.isRepository) {
+    io.stderr.write("git-persona: repo commands require a Git repository\n");
+    io.exit(1);
+    return;
+  }
+
+  let config;
+
+  try {
+    config = loadConfig();
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  if (options.action === "bind") {
+    const profile = config.profiles[options.id];
+
+    if (!profile) {
+      io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+      io.exit(1);
+      return;
+    }
+
+    try {
+      applyGitProfile(profile, "repo", state.cwd);
+      config.active.repositories[state.cwd] = profile.id;
+      saveConfig(config);
+    } catch (error) {
+      io.stderr.write(`git-persona: ${error.message}\n`);
+      io.exit(1);
+      return;
+    }
+
+    io.stdout.write(`Bound this repo to '${profile.id}'.\n`);
+    return;
+  }
+
+  try {
+    clearGitProfile("repo", state.cwd);
+    delete config.active.repositories[state.cwd];
+    saveConfig(config);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  io.stdout.write("Removed repo binding.\n");
+}
+
 function renderPicker(io, profiles, index) {
   io.stdout.write("\x1b[2J\x1b[H");
   io.stdout.write("Select persona\n\n");
@@ -518,6 +632,11 @@ export async function run(args, io) {
 
   if (command === "switch") {
     await runSwitch(commandArgs, io);
+    return;
+  }
+
+  if (command === "repo") {
+    runRepo(commandArgs, io);
     return;
   }
 
