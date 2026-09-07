@@ -24,18 +24,20 @@ function runGit(args, options = {}) {
   };
 }
 
-function readConfigValue(key, scope, cwd) {
-  const args = ["config"];
-
+function configScopeArgs(scope) {
   if (scope === "global") {
-    args.push("--global");
+    return ["--global"];
   }
 
   if (scope === "local") {
-    args.push("--local");
+    return ["--local"];
   }
 
-  args.push("--get", key);
+  return [];
+}
+
+function readConfigValue(key, scope, cwd) {
+  const args = ["config", ...configScopeArgs(scope), "--get", key];
 
   const result = runGit(args, { cwd });
 
@@ -44,6 +46,32 @@ function readConfigValue(key, scope, cwd) {
   }
 
   return result.stdout || null;
+}
+
+export function writeConfigValue(key, value, scope, cwd = process.cwd()) {
+  const scopeArgs = configScopeArgs(scope);
+  const args =
+    value === null || value === undefined
+      ? ["config", ...scopeArgs, "--unset", key]
+      : ["config", ...scopeArgs, key, value];
+
+  const result = runGit(args, { cwd });
+
+  if (!result.ok && !(value === null || value === undefined)) {
+    throw new Error(result.stderr || `git config failed for ${key}`);
+  }
+}
+
+export function applyGitProfile(profile, scope, cwd = process.cwd()) {
+  const configScope = scope === "repo" ? "local" : "global";
+  const git = profile.git ?? {};
+
+  writeConfigValue("user.name", git.name, configScope, cwd);
+  writeConfigValue("user.email", git.email, configScope, cwd);
+  writeConfigValue("user.signingkey", git.signingKey, configScope, cwd);
+  writeConfigValue("gpg.format", git.gpgFormat, configScope, cwd);
+  writeConfigValue("commit.gpgsign", git.commitGpgSign, configScope, cwd);
+  writeConfigValue("credential.helper", git.credentialHelper, configScope, cwd);
 }
 
 function readGithubCredential(cwd) {

@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { getConfigPath, listProfiles, loadConfig, saveConfig } from "./config.js";
-import { getCurrentGitState } from "./git.js";
+import { applyGitProfile, getCurrentGitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
@@ -38,7 +38,6 @@ Options:
 `;
 
 const plannedCommands = new Set([
-  "switch",
   "add",
   "edit",
   "remove",
@@ -116,6 +115,32 @@ function parseMigrationArgs(args) {
     }
 
     throw new Error(`unknown migration option '${arg}'`);
+  }
+
+  return options;
+}
+
+function parseSwitchArgs(args) {
+  const options = {
+    id: null,
+    scope: "global",
+  };
+
+  for (const arg of args) {
+    if (arg === "--repo") {
+      options.scope = "repo";
+      continue;
+    }
+
+    if (arg.startsWith("--")) {
+      throw new Error(`unknown switch option '${arg}'`);
+    }
+
+    if (options.id) {
+      throw new Error(`unexpected switch argument '${arg}'`);
+    }
+
+    options.id = arg;
   }
 
   return options;
@@ -291,6 +316,69 @@ function runList(io) {
   }
 }
 
+function runSwitch(args, io) {
+  let options;
+
+  try {
+    options = parseSwitchArgs(args);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(2);
+    return;
+  }
+
+  if (!options.id) {
+    io.stderr.write(
+      "git-persona: terminal selector is not implemented yet. Pass a persona id.\n",
+    );
+    io.exit(2);
+    return;
+  }
+
+  let config;
+
+  try {
+    config = loadConfig();
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  const profile = config.profiles[options.id];
+
+  if (!profile) {
+    io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+    io.exit(1);
+    return;
+  }
+
+  try {
+    applyGitProfile(profile, options.scope);
+
+    if (options.scope === "repo") {
+      const state = getCurrentGitState();
+
+      if (!state.isRepository) {
+        throw new Error("--repo requires a Git repository");
+      }
+
+      config.active.repositories[state.cwd] = profile.id;
+    } else {
+      config.active.global = profile.id;
+    }
+
+    saveConfig(config);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  io.stdout.write(`Switched ${options.scope} persona to '${profile.id}'.\n`);
+  io.stdout.write("Auth preference: HTTPS token, then SSH fallback.\n");
+}
+
 export async function run(args, io) {
   const [command, ...commandArgs] = args;
 
@@ -316,6 +404,11 @@ export async function run(args, io) {
 
   if (command === "list") {
     runList(io);
+    return;
+  }
+
+  if (command === "switch") {
+    runSwitch(commandArgs, io);
     return;
   }
 
