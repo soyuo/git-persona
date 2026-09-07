@@ -46,6 +46,30 @@ function readConfigValue(key, scope, cwd) {
   return result.stdout || null;
 }
 
+function readGithubCredential(cwd) {
+  const result = spawnSync("git", ["credential-manager", "get"], {
+    cwd,
+    input: "protocol=https\nhost=github.com\n\n",
+    encoding: "utf8",
+    windowsHide: true,
+  });
+
+  if (result.status !== 0) {
+    return {
+      found: false,
+      username: null,
+    };
+  }
+
+  const lines = result.stdout.trim().split(/\r?\n/);
+  const usernameLine = lines.find((line) => line.startsWith("username="));
+
+  return {
+    found: lines.some((line) => line.startsWith("password=")),
+    username: usernameLine ? usernameLine.slice("username=".length) : null,
+  };
+}
+
 function readConfigScope(scope, cwd) {
   return Object.fromEntries(
     gitConfigKeys.map((key) => [key, readConfigValue(key, scope, cwd)]),
@@ -59,8 +83,9 @@ export function getCurrentGitState(cwd = process.cwd()) {
   return {
     cwd,
     isRepository,
+    effective: readConfigScope("effective", cwd),
     global: readConfigScope("global", cwd),
     local: isRepository ? readConfigScope("local", cwd) : null,
+    githubCredential: readGithubCredential(cwd),
   };
 }
-

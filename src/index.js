@@ -36,7 +36,6 @@ Options:
 `;
 
 const plannedCommands = new Set([
-  "migration",
   "list",
   "switch",
   "add",
@@ -79,8 +78,103 @@ function runCurrent(io) {
   }
 }
 
+function parseMigrationArgs(args) {
+  const options = {
+    dryRun: false,
+    name: null,
+    scope: "global",
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+
+    if (arg === "--repo") {
+      options.scope = "repo";
+      continue;
+    }
+
+    if (arg === "--name") {
+      const value = args[index + 1];
+
+      if (!value || value.startsWith("--")) {
+        throw new Error("--name requires a value");
+      }
+
+      options.name = value;
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`unknown migration option '${arg}'`);
+  }
+
+  return options;
+}
+
+function inferProfileName(state, values) {
+  if (state.githubCredential.username) {
+    return state.githubCredential.username;
+  }
+
+  if (values["user.email"]) {
+    return values["user.email"].split("@")[0];
+  }
+
+  if (values["user.name"]) {
+    return values["user.name"].toLowerCase().replace(/\s+/g, "-");
+  }
+
+  return "default";
+}
+
+function runMigration(args, io) {
+  let options;
+
+  try {
+    options = parseMigrationArgs(args);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(2);
+    return;
+  }
+
+  const state = getCurrentGitState();
+  const values = options.scope === "repo" && state.local ? state.local : state.effective;
+  const profileName = options.name ?? inferProfileName(state, values);
+
+  io.stdout.write("Migration preview\n");
+  io.stdout.write(`Profile: ${profileName}\n`);
+  io.stdout.write(`Scope: ${options.scope}\n`);
+  io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
+  writeConfigBlock(io, "Detected Git config:", values);
+  io.stdout.write("\n");
+  io.stdout.write("Detected GitHub credential:\n");
+  io.stdout.write(
+    `  status: ${state.githubCredential.found ? "found" : "not found"}\n`,
+  );
+  io.stdout.write(
+    `  github id: ${formatValue(state.githubCredential.username)}\n`,
+  );
+  io.stdout.write("  token: (hidden)\n\n");
+
+  if (options.dryRun) {
+    io.stdout.write("No files were changed because --dry-run was used.\n");
+    return;
+  }
+
+  io.stderr.write(
+    "git-persona: migration confirmation flow is not implemented yet. Use --dry-run to preview.\n",
+  );
+  io.exit(2);
+}
+
 export function run(args, io) {
-  const [command] = args;
+  const [command, ...commandArgs] = args;
 
   if (!command || command === "-h" || command === "--help") {
     io.stdout.write(helpText);
@@ -94,6 +188,11 @@ export function run(args, io) {
 
   if (command === "current") {
     runCurrent(io);
+    return;
+  }
+
+  if (command === "migration") {
+    runMigration(commandArgs, io);
     return;
   }
 
