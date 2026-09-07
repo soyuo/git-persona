@@ -44,6 +44,29 @@ git persona <command>
 
 Configuration is stored at `~/.git-persona/config.json`.
 
+## Language
+
+The CLI supports English (`en-US`) and Korean (`ko-KR`). Check the current language:
+
+```bash
+git persona lang
+```
+
+Set the global language for all repositories:
+
+```bash
+git persona lang ko-KR
+git persona lang en-US
+```
+
+Set a language only for the current repository:
+
+```bash
+git persona lang ko-KR --repo
+```
+
+The repository-specific language takes precedence over the global language in that repository. Other repositories continue to use the global setting.
+
 ## Migration
 
 Preview the current Git identity without changing files:
