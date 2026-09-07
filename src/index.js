@@ -12,13 +12,13 @@ import {
   runGitCommand,
 } from "./git/index.js";
 import { aqua, blue, dim, green } from "./style.js";
-import { runProfileCommand } from "./commands/profiles.js";
 import {
   runCredentials,
+  runDoctor,
   runLogin,
   runLogout,
-} from "./commands/credentials.js";
-import { runDoctor } from "./commands/doctor.js";
+  runProfileCommand,
+} from "./commands/index.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
