@@ -602,6 +602,8 @@ async function chooseProfile(io, profiles, startIndex) {
         input.setRawMode(false);
       }
 
+      input.pause();
+
       output.write("\x1b[?25h");
       resolve(value);
     };
