@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getCurrentGitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
@@ -36,7 +37,6 @@ Options:
 
 const plannedCommands = new Set([
   "migration",
-  "current",
   "list",
   "switch",
   "add",
@@ -49,6 +49,36 @@ const plannedCommands = new Set([
   "doctor",
 ]);
 
+function formatValue(value) {
+  return value ?? "(not set)";
+}
+
+function writeConfigBlock(io, title, values) {
+  io.stdout.write(`${title}\n`);
+  io.stdout.write(`  user.name: ${formatValue(values["user.name"])}\n`);
+  io.stdout.write(`  user.email: ${formatValue(values["user.email"])}\n`);
+  io.stdout.write(`  user.signingkey: ${formatValue(values["user.signingkey"])}\n`);
+  io.stdout.write(`  gpg.format: ${formatValue(values["gpg.format"])}\n`);
+  io.stdout.write(`  commit.gpgsign: ${formatValue(values["commit.gpgsign"])}\n`);
+  io.stdout.write(
+    `  credential.helper: ${formatValue(values["credential.helper"])}\n`,
+  );
+}
+
+function runCurrent(io) {
+  const state = getCurrentGitState();
+
+  io.stdout.write("Current Git state\n");
+  io.stdout.write(`Repository: ${state.isRepository ? "yes" : "no"}\n\n`);
+
+  writeConfigBlock(io, "Global config:", state.global);
+
+  if (state.local) {
+    io.stdout.write("\n");
+    writeConfigBlock(io, "Local config:", state.local);
+  }
+}
+
 export function run(args, io) {
   const [command] = args;
 
@@ -59,6 +89,11 @@ export function run(args, io) {
 
   if (command === "-v" || command === "--version") {
     io.stdout.write(`${packageJson.version}\n`);
+    return;
+  }
+
+  if (command === "current") {
+    runCurrent(io);
     return;
   }
 
