@@ -83,6 +83,50 @@ export function applyProfile(profile, scope, cwd = process.cwd()) {
   );
 }
 
+export function runGitCommand(args, cwd = process.cwd()) {
+  return runGit(args, { cwd });
+}
+
+function sshUrl(url) {
+  const match = url.match(/^https?:\/\/(?:[^@/]+@)?github\.com\/(.+)$/i);
+
+  return match ? `git@github.com:${match[1]}` : null;
+}
+
+export function rewriteGithubRemotes(cwd = process.cwd()) {
+  const remotes = runGit(["remote"], { cwd });
+
+  if (!remotes.ok) {
+    throw new Error(remotes.stderr || "could not list Git remotes");
+  }
+
+  const changed = [];
+
+  for (const name of remotes.stdout.split(/\r?\n/).filter(Boolean)) {
+    const current = runGit(["remote", "get-url", name], { cwd });
+
+    if (!current.ok) {
+      continue;
+    }
+
+    const next = sshUrl(current.stdout);
+
+    if (!next) {
+      continue;
+    }
+
+    const result = runGit(["remote", "set-url", name, next], { cwd });
+
+    if (!result.ok) {
+      throw new Error(result.stderr || `could not update remote '${name}'`);
+    }
+
+    changed.push({ name, from: current.stdout, to: next });
+  }
+
+  return changed;
+}
+
 export function clearProfile(scope, cwd = process.cwd()) {
   const configScope = scope === "repo" ? "local" : "global";
 

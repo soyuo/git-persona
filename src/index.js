@@ -10,6 +10,8 @@ import {
   eraseGithubCredential,
   githubAccounts,
   gitState,
+  rewriteGithubRemotes,
+  runGitCommand,
   storeGithubCredential,
 } from "./git.js";
 
@@ -38,6 +40,7 @@ Commands:
   logout <id>      Remove credentials for a persona
   credentials      List credential targets without secret values
   repo             Manage repository persona bindings
+  run <git-command> Run a Git command with SSH fallback
   doctor           Check Git, credentials, SSH, and persona state
 
 Options:
@@ -707,6 +710,88 @@ function runCredentials(args, io) {
   }
 }
 
+function authFailure(result) {
+  const message = `${result.stdout}\n${result.stderr}`.toLowerCase();
+
+  return [
+    "authentication failed",
+    "could not read username",
+    "permission denied",
+    "access denied",
+    "repository not found",
+  ].some((text) => message.includes(text));
+}
+
+function writeGitResult(io, result) {
+  if (result.stdout) {
+    io.stdout.write(`${result.stdout}\n`);
+  }
+
+  if (result.stderr) {
+    io.stderr.write(`${result.stderr}\n`);
+  }
+}
+
+function activeId(config, state) {
+  return state.isRepository
+    ? config.active.repositories[state.cwd] ?? config.active.global
+    : config.active.global;
+}
+
+function runGitWithFallback(args, io) {
+  if (args.length === 0) {
+    io.stderr.write("git-persona: run requires a Git command\n");
+    io.exit(2);
+    return;
+  }
+
+  const first = runGitCommand(args);
+
+  if (first.ok || !authFailure(first)) {
+    writeGitResult(io, first);
+
+    if (!first.ok) {
+      io.exit(first.status ?? 1);
+    }
+
+    return;
+  }
+
+  let changed;
+
+  try {
+    changed = rewriteGithubRemotes();
+  } catch (error) {
+    writeGitResult(io, first);
+    io.stderr.write(`git-persona: SSH fallback could not update remotes: ${error.message}\n`);
+    io.exit(first.status ?? 1);
+    return;
+  }
+
+  if (changed.length === 0) {
+    writeGitResult(io, first);
+    io.stderr.write("git-persona: no GitHub HTTPS remote was available for SSH fallback\n");
+    io.exit(first.status ?? 1);
+    return;
+  }
+
+  io.stderr.write("git-persona: HTTPS authentication failed; switched GitHub remotes to SSH and retrying\n");
+
+  const retry = runGitCommand(args);
+  writeGitResult(io, retry);
+
+  if (retry.ok) {
+    return;
+  }
+
+  const config = load();
+  const id = activeId(config, gitState());
+  const login = id ? `git persona login ${id}` : "git persona login <id>";
+
+  io.stderr.write(`git-persona: SSH authentication failed; run '${login}'\n`);
+  io.exit(retry.status ?? 1);
+}
+
 function parseRepoArgs(args) {
   const options = {
     action: null,
@@ -1038,6 +1123,11 @@ export async function run(args, io) {
 
   if (command === "credentials") {
     runCredentials(commandArgs, io);
+    return;
+  }
+
+  if (command === "run") {
+    runGitWithFallback(commandArgs, io);
     return;
   }
 

@@ -60,6 +60,9 @@ Migration uses a preview/confirm flow before applying changes.
 - Token values should not be stored in plaintext profile files.
 - HTTPS token auth is preferred when a persona has both HTTPS token auth and SSH auth.
 - SSH auth is used as the fallback when HTTPS token auth is unavailable or fails.
+- Persona-specific GitHub credentials use the GitHub username as the GCM account selector.
+- `git persona run <git-command> [args...]` retries a GitHub HTTPS authentication failure once after rewriting GitHub HTTPS remotes to SSH.
+- If the SSH retry fails, the CLI asks the user to run `git persona login <id>`.
 
 Example selector:
 
@@ -158,6 +161,13 @@ git persona repo unbind
 
 Binds or unbinds the current repository to a persona.
 
+```bash
+git persona run <git-command> [args...]
+```
+
+Runs a Git command, switching GitHub HTTPS remotes to SSH and retrying once
+when HTTPS authentication fails.
+
 ### Diagnostics
 
 ```bash
@@ -168,7 +178,6 @@ Checks Git config, credential manager status, SSH/signing settings, remote URL c
 
 ## Open Questions
 
-These decisions affect behavior and should be confirmed before implementing the token-switching core.
+These decisions remain for later implementation.
 
-1. What should the exact credential-manager target format be for multiple saved GitHub ID tokens?
-2. Should failed HTTPS token auth automatically retry SSH in the same Git operation, or should `git persona doctor` only recommend switching/fixing auth after detection?
+1. How should SSH key availability and signing-key validity be diagnosed by `doctor`?
