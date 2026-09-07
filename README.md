@@ -97,6 +97,15 @@ git persona list
 git persona remove work
 ```
 
+Add an SSH signing key and configure Git Credential Manager for a persona:
+
+```bash
+git persona edit work --signing-key "C:\\Users\\user\\.ssh\\id_ed25519.pub" --gpg-format ssh --commit-gpg-sign true --credential-helper manager
+git persona switch work
+```
+
+`--signing-key` expects the public key file path, not the `SHA256:...` fingerprint. The fingerprint is only used to verify that the correct key was added to GitHub. `--credential-helper manager` configures Git to use Git Credential Manager for HTTPS credentials.
+
 An active persona or repo-bound persona cannot be removed. Switch to another persona and retry.
 
 ## Switching personas

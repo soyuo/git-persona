@@ -97,6 +97,15 @@ git persona list
 git persona remove work
 ```
 
+persona에 SSH 서명키와 Git Credential Manager를 설정하려면 다음과 같이 실행합니다.
+
+```bash
+git persona edit work --signing-key "C:\\Users\\user\\.ssh\\id_ed25519.pub" --gpg-format ssh --commit-gpg-sign true --credential-helper manager
+git persona switch work
+```
+
+`--signing-key`에는 `SHA256:...` fingerprint가 아니라 공개키 파일 경로를 입력해야 합니다. fingerprint는 GitHub에 올바른 키가 등록되었는지 확인할 때만 사용합니다. `--credential-helper manager`는 HTTPS credential에 Git Credential Manager를 사용하도록 Git을 설정합니다.
+
 현재 활성화된 persona 또는 저장소에 연결된 persona는 삭제할 수 없습니다. 먼저 다른 persona로 전환한 후 다시 시도해야 합니다.
 
 ## Persona 전환
