@@ -27,7 +27,7 @@ export function runLang(args, io) {
   const locale = values[0];
 
   if (repo) {
-    if (!gitState().isRepository) {
+    if (!gitState(process.cwd(), { credentials: false }).isRepository) {
       io.stderr.write(`git-persona: ${message(current, "lang.requiresRepo")}\n`);
       io.exit(1);
       return;

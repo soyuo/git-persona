@@ -110,7 +110,7 @@ function writeConfigBlock(io, title, values, locale) {
 }
 
 function runCurrent(io) {
-  const state = gitState();
+  const state = gitState(process.cwd(), { credentials: false });
   const config = load();
   const locale = localeOf(config, state.cwd);
   const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
@@ -291,7 +291,7 @@ async function runMigration(args, io) {
     return;
   }
 
-  const state = gitState();
+  const state = gitState(process.cwd(), { credentials: false });
   const values = options.scope === "repo" && state.local ? state.local : state.effective;
   const profileName = options.name ?? inferProfileName(state, values);
   const profile = migrationProfile(profileName, state, values);
@@ -662,7 +662,7 @@ async function runSwitch(args, io) {
     return;
   }
 
-  const state = gitState();
+  const state = gitState(process.cwd(), { credentials: false });
   let config;
 
   try {

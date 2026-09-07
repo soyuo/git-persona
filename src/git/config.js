@@ -64,7 +64,7 @@ function readScope(scope, cwd) {
   return Object.fromEntries(configKeys.map((key) => [key, readValue(key, scope, cwd)]));
 }
 
-export function gitState(cwd = process.cwd()) {
+export function gitState(cwd = process.cwd(), options = {}) {
   const repoResult = runGit(["rev-parse", "--is-inside-work-tree"], { cwd });
   const isRepository = repoResult.ok && repoResult.stdout === "true";
 
@@ -74,6 +74,8 @@ export function gitState(cwd = process.cwd()) {
     effective: readScope("effective", cwd),
     global: readScope("global", cwd),
     local: isRepository ? readScope("local", cwd) : null,
-    githubCredential: githubState(cwd),
+    githubCredential: options.credentials === false
+      ? { found: false, username: null }
+      : githubState(cwd),
   };
 }
