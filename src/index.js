@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { getConfigPath, listProfiles, loadConfig } from "./config.js";
+import { getConfigPath, listProfiles, loadConfig, saveConfig } from "./config.js";
 import { getCurrentGitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -136,7 +137,73 @@ function inferProfileName(state, values) {
   return "default";
 }
 
-function runMigration(args, io) {
+function createMigrationProfile(profileName, state, values) {
+  const httpsUsername = state.githubCredential.username ?? profileName;
+
+  return {
+    id: profileName,
+    git: {
+      name: values["user.name"],
+      email: values["user.email"],
+      signingKey: values["user.signingkey"],
+      gpgFormat: values["gpg.format"],
+      commitGpgSign: values["commit.gpgsign"],
+      credentialHelper: values["credential.helper"],
+    },
+    auth: {
+      preferred: "https",
+      https: {
+        host: "github.com",
+        username: httpsUsername,
+        credentialTarget: "git:https://github.com",
+        tokenStored: state.githubCredential.found,
+      },
+      ssh: {
+        fallback: true,
+        signingKey: values["user.signingkey"],
+      },
+    },
+  };
+}
+
+async function confirmMigration(io) {
+  io.stdout.write("Apply this migration? [y/N] ");
+
+  if (!io.stdin?.isTTY) {
+    const input = readFileSync(io.stdin?.fd ?? 0, "utf8").trim().toLowerCase();
+
+    return input === "y" || input === "yes";
+  }
+
+  const readline = createInterface({
+    input: io.stdin,
+    output: io.stdout,
+  });
+
+  try {
+    const answer = (await readline.question("")).trim().toLowerCase();
+
+    return answer === "y" || answer === "yes";
+  } finally {
+    readline.close();
+  }
+}
+
+function applyMigration(profileName, profile, options, state) {
+  const config = loadConfig();
+
+  config.profiles[profileName] = profile;
+
+  if (options.scope === "repo") {
+    config.active.repositories[state.cwd] = profileName;
+  } else {
+    config.active.global = profileName;
+  }
+
+  saveConfig(config);
+}
+
+async function runMigration(args, io) {
   let options;
 
   try {
@@ -150,6 +217,7 @@ function runMigration(args, io) {
   const state = getCurrentGitState();
   const values = options.scope === "repo" && state.local ? state.local : state.effective;
   const profileName = options.name ?? inferProfileName(state, values);
+  const profile = createMigrationProfile(profileName, state, values);
 
   io.stdout.write("Migration preview\n");
   io.stdout.write(`Profile: ${profileName}\n`);
@@ -171,10 +239,23 @@ function runMigration(args, io) {
     return;
   }
 
-  io.stderr.write(
-    "git-persona: migration confirmation flow is not implemented yet. Use --dry-run to preview.\n",
-  );
-  io.exit(2);
+  const confirmed = await confirmMigration(io);
+
+  if (!confirmed) {
+    io.stdout.write("Migration cancelled.\n");
+    return;
+  }
+
+  try {
+    applyMigration(profileName, profile, options, state);
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  io.stdout.write(`Saved persona '${profileName}'.\n`);
+  io.stdout.write(`Config: ${getConfigPath()}\n`);
 }
 
 function runList(io) {
@@ -210,7 +291,7 @@ function runList(io) {
   }
 }
 
-export function run(args, io) {
+export async function run(args, io) {
   const [command, ...commandArgs] = args;
 
   if (!command || command === "-h" || command === "--help") {
@@ -229,7 +310,7 @@ export function run(args, io) {
   }
 
   if (command === "migration") {
-    runMigration(commandArgs, io);
+    await runMigration(commandArgs, io);
     return;
   }
 
