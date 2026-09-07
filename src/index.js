@@ -14,7 +14,7 @@ import {
 import { aqua, blue, dim, green } from "./style.js";
 import {
   runCredentials,
-  runDoctor,
+  runCheck,
   runLogin,
   runLogout,
   runProfileCommand,
@@ -46,7 +46,7 @@ Commands:
   credentials      List credential targets without secret values
   repo             Manage repository persona bindings
   run <git-command> Run a Git command with SSH fallback
-  doctor           Check Git, credentials, SSH, and persona state
+  check            Check Git, credentials, SSH, and persona state
 
 Options:
   -h, --help       Show this help
@@ -764,8 +764,8 @@ export async function run(args, io) {
     return;
   }
 
-  if (command === "doctor") {
-    runDoctor(commandArgs, io);
+  if (command === "check") {
+    runCheck(commandArgs, io);
     return;
   }
 

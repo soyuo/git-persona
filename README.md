@@ -117,10 +117,10 @@ Run the read-only diagnostic command:
 
 ```bash
 git persona current
-git persona doctor
+git persona check
 ```
 
-`doctor` checks Git, GCM, active persona consistency, credential presence, SSH availability, signing-key configuration, and repository remotes. Warnings do not produce a failing exit code; failures do.
+`check` checks Git, GCM, active persona consistency, credential presence, SSH availability, signing-key configuration, and repository remotes. Warnings do not produce a failing exit code; failures do.
 
 ## Development
 

@@ -8,9 +8,9 @@ import {
 } from "../git/index.js";
 import { green, red, yellow } from "../style.js";
 
-export function runDoctor(args, io) {
+export function runCheck(args, io) {
   if (args.length > 0) {
-    io.stderr.write("git-persona: doctor takes no arguments\n");
+    io.stderr.write("git-persona: check takes no arguments\n");
     io.exit(2);
     return;
   }
@@ -26,21 +26,18 @@ export function runDoctor(args, io) {
   }
 
   const state = gitState();
-  const repoId = state.isRepository
-    ? config.active.repositories[state.cwd] ?? null
-    : null;
+  const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
   const activeId = repoId ?? config.active.global;
   const profile = activeId ? config.profiles[activeId] : null;
   let failures = 0;
   let warnings = 0;
 
   const report = (status, label, detail) => {
-    const tag =
-      status === "FAIL"
-        ? red(`[${status}]`, io.stdout)
-        : status === "WARN"
-          ? yellow(`[${status}]`, io.stdout)
-          : green(`[${status}]`, io.stdout);
+    const tag = status === "FAIL"
+      ? red(`[${status}]`, io.stdout)
+      : status === "WARN"
+        ? yellow(`[${status}]`, io.stdout)
+        : green(`[${status}]`, io.stdout);
     io.stdout.write(`${tag} ${label}: ${detail}\n`);
 
     if (status === "WARN") warnings += 1;
@@ -114,7 +111,7 @@ export function runDoctor(args, io) {
     const summary = [];
     if (failures > 0) summary.push(`${failures} issue(s)`);
     if (warnings > 0) summary.push(`${warnings} warning(s)`);
-    io.stderr.write(`git-persona: doctor found ${summary.join(" and ")}\n`);
+    io.stderr.write(`git-persona: check found ${summary.join(" and ")}\n`);
   }
 
   if (failures > 0) io.exit(1);
