@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { getConfigPath, listProfiles, loadConfig, saveConfig } from "./config.js";
@@ -316,7 +317,92 @@ function runList(io) {
   }
 }
 
-function runSwitch(args, io) {
+function renderPicker(io, profiles, index) {
+  io.stdout.write("\x1b[2J\x1b[H");
+  io.stdout.write("Select persona\n\n");
+
+  for (let i = 0; i < profiles.length; i += 1) {
+    const profile = profiles[i];
+    const email = profile.git?.email ? ` <${profile.git.email}>` : "";
+    const cred = profile.auth?.https?.username ? ` [https:${profile.auth.https.username}]` : "";
+
+    io.stdout.write(`${formatSelected(i === index)} ${profile.id}${email}${cred}\n`);
+  }
+
+  io.stdout.write("\nUse \u2191/\u2193, j/k, Enter, Esc\n");
+}
+
+async function chooseProfile(io, profiles, startIndex) {
+  if (!io.stdin?.isTTY || !io.stdout?.isTTY) {
+    throw new Error("terminal selector requires an interactive terminal");
+  }
+
+  const input = io.stdin;
+  const output = io.stdout;
+  let index = Math.max(0, Math.min(startIndex, profiles.length - 1));
+
+  return await new Promise((resolve, reject) => {
+    let closed = false;
+
+    const finish = (value) => {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+      input.off("keypress", onKey);
+
+      if (typeof input.setRawMode === "function") {
+        input.setRawMode(false);
+      }
+
+      output.write("\x1b[?25h");
+      resolve(value);
+    };
+
+    const cancel = () => {
+      finish(null);
+      reject(new Error("selection cancelled"));
+    };
+
+    const draw = () => renderPicker(io, profiles, index);
+
+    const onKey = (str, key) => {
+      if (key.name === "up" || key.name === "k") {
+        index = (index - 1 + profiles.length) % profiles.length;
+        draw();
+        return;
+      }
+
+      if (key.name === "down" || key.name === "j") {
+        index = (index + 1) % profiles.length;
+        draw();
+        return;
+      }
+
+      if (key.name === "return") {
+        finish(profiles[index]);
+        return;
+      }
+
+      if (key.name === "escape" || (key.ctrl && key.name === "c")) {
+        cancel();
+      }
+    };
+
+    emitKeypressEvents(input);
+
+    if (typeof input.setRawMode === "function") {
+      input.setRawMode(true);
+    }
+
+    output.write("\x1b[?25l");
+    input.on("keypress", onKey);
+    draw();
+  });
+}
+
+async function runSwitch(args, io) {
   let options;
 
   try {
@@ -327,14 +413,7 @@ function runSwitch(args, io) {
     return;
   }
 
-  if (!options.id) {
-    io.stderr.write(
-      "git-persona: terminal selector is not implemented yet. Pass a persona id.\n",
-    );
-    io.exit(2);
-    return;
-  }
-
+  const state = getCurrentGitState();
   let config;
 
   try {
@@ -345,20 +424,50 @@ function runSwitch(args, io) {
     return;
   }
 
-  const profile = config.profiles[options.id];
+  const profiles = listProfiles(config);
 
-  if (!profile) {
-    io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+  if (profiles.length === 0) {
+    io.stderr.write("git-persona: no personas saved yet\n");
     io.exit(1);
     return;
+  }
+
+  let profile = options.id ? config.profiles[options.id] : null;
+
+  if (!profile) {
+    if (options.id) {
+      io.stderr.write(`git-persona: persona '${options.id}' does not exist\n`);
+      io.exit(1);
+      return;
+    }
+
+    const currentId =
+      options.scope === "repo"
+        ? config.active.repositories[state.cwd] ?? config.active.global
+        : config.active.global;
+    const startIndex = Math.max(
+      0,
+      profiles.findIndex((item) => item.id === currentId),
+    );
+
+    try {
+      profile = await chooseProfile(io, profiles, startIndex);
+    } catch (error) {
+      io.stderr.write(`git-persona: ${error.message}\n`);
+      io.exit(1);
+      return;
+    }
+
+    if (!profile) {
+      io.stdout.write("Selection cancelled.\n");
+      return;
+    }
   }
 
   try {
     applyGitProfile(profile, options.scope);
 
     if (options.scope === "repo") {
-      const state = getCurrentGitState();
-
       if (!state.isRepository) {
         throw new Error("--repo requires a Git repository");
       }
@@ -408,7 +517,7 @@ export async function run(args, io) {
   }
 
   if (command === "switch") {
-    runSwitch(commandArgs, io);
+    await runSwitch(commandArgs, io);
     return;
   }
 
