@@ -10,7 +10,8 @@
   },
   "scripts": {
     "start": "node ./bin/git-persona.js",
-    "check": "node ./bin/git-persona.js --help && node ./bin/git-persona.js --version"
+    "check": "node ./bin/git-persona.js --help && node ./bin/git-persona.js --version",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
