@@ -291,7 +291,7 @@ async function runMigration(args, io) {
     return;
   }
 
-  const state = gitState(process.cwd(), { credentials: false });
+  const state = gitState();
   const values = options.scope === "repo" && state.local ? state.local : state.effective;
   const profileName = options.name ?? inferProfileName(state, values);
   const profile = migrationProfile(profileName, state, values);
@@ -506,7 +506,7 @@ function runRepo(args, io) {
     return;
   }
 
-  const state = gitState();
+  const state = gitState(process.cwd(), { credentials: false });
 
   if (!state.isRepository) {
     io.stderr.write(`git-persona: ${message(locale, "repo.requiresRepo")}\n`);
