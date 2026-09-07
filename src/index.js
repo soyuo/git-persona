@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getConfigPath, listProfiles, loadConfig } from "./config.js";
 import { getCurrentGitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -36,7 +37,6 @@ Options:
 `;
 
 const plannedCommands = new Set([
-  "list",
   "switch",
   "add",
   "edit",
@@ -50,6 +50,10 @@ const plannedCommands = new Set([
 
 function formatValue(value) {
   return value ?? "(not set)";
+}
+
+function formatSelected(isSelected) {
+  return isSelected ? "◉" : "○";
 }
 
 function writeConfigBlock(io, title, values) {
@@ -173,6 +177,39 @@ function runMigration(args, io) {
   io.exit(2);
 }
 
+function runList(io) {
+  let config;
+
+  try {
+    config = loadConfig();
+  } catch (error) {
+    io.stderr.write(`git-persona: ${error.message}\n`);
+    io.exit(1);
+    return;
+  }
+
+  const profiles = listProfiles(config);
+
+  io.stdout.write("Git personas\n");
+  io.stdout.write(`Config: ${getConfigPath()}\n\n`);
+
+  if (profiles.length === 0) {
+    io.stdout.write("No personas saved yet.\n");
+    io.stdout.write("Run `git persona migration --dry-run` to preview the current Git account.\n");
+    return;
+  }
+
+  for (const profile of profiles) {
+    const marker = formatSelected(profile.id === config.active.global);
+    const email = profile.git?.email ? ` <${profile.git.email}>` : "";
+    const credential = profile.auth?.https?.username
+      ? ` [https:${profile.auth.https.username}]`
+      : "";
+
+    io.stdout.write(`${marker} ${profile.id}${email}${credential}\n`);
+  }
+}
+
 export function run(args, io) {
   const [command, ...commandArgs] = args;
 
@@ -193,6 +230,11 @@ export function run(args, io) {
 
   if (command === "migration") {
     runMigration(commandArgs, io);
+    return;
+  }
+
+  if (command === "list") {
+    runList(io);
     return;
   }
 
