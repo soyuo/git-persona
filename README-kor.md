@@ -138,6 +138,25 @@ git persona logout work
 git persona credentials
 ```
 
+Git Credential Manager에 계정이 이미 등록되어 있다면, 전환하기 전에 같은 GitHub ID를 persona로 등록해야 합니다.
+
+```bash
+git persona add soyuo2
+git persona switch soyuo2
+```
+
+해당 persona의 GitHub credential이 GCM에 존재하는지 확인합니다.
+
+```bash
+git persona credentials
+```
+
+credential이 아직 없다면 숨겨진 token 입력을 통해 등록합니다.
+
+```bash
+git persona login soyuo2
+```
+
 token은 `config.json`에 저장하지 않으며, 일반 출력에 표시하거나 command-line argument로 받지 않습니다. `credentials`는 일치하는 GitHub account가 GCM에 존재하는지만 표시합니다.
 
 Persona 전환은 `credential.https://github.com.username`을 사용해 GitHub account를 선택합니다. token 자체는 GCM이 관리하는 운영체제 credential store에 보관됩니다.

@@ -138,6 +138,25 @@ git persona logout work
 git persona credentials
 ```
 
+If an account is already registered in Git Credential Manager, register the same GitHub ID as a persona before switching to it:
+
+```bash
+git persona add soyuo2
+git persona switch soyuo2
+```
+
+Check whether the persona's GitHub credential is available in GCM:
+
+```bash
+git persona credentials
+```
+
+If the credential is not available yet, add it through the hidden token prompt:
+
+```bash
+git persona login soyuo2
+```
+
 Tokens are never stored in `config.json`, shown in ordinary output, or accepted as command-line arguments. `credentials` reports only whether a matching GitHub account is present in GCM.
 
 Persona switching selects the GitHub account with `credential.https://github.com.username`. The token itself remains in the operating system credential store managed by GCM.
