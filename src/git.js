@@ -7,6 +7,7 @@ const gitConfigKeys = [
   "gpg.format",
   "commit.gpgsign",
   "credential.helper",
+  "credential.https://github.com.username",
 ];
 
 function runGit(args, options = {}) {
@@ -65,6 +66,8 @@ export function setConfig(key, value, scope, cwd = process.cwd()) {
 export function applyProfile(profile, scope, cwd = process.cwd()) {
   const configScope = scope === "repo" ? "local" : "global";
   const git = profile.git ?? {};
+  const https = profile.auth?.https ?? {};
+  const username = https.username ?? profile.id;
 
   setConfig("user.name", git.name, configScope, cwd);
   setConfig("user.email", git.email, configScope, cwd);
@@ -72,6 +75,12 @@ export function applyProfile(profile, scope, cwd = process.cwd()) {
   setConfig("gpg.format", git.gpgFormat, configScope, cwd);
   setConfig("commit.gpgsign", git.commitGpgSign, configScope, cwd);
   setConfig("credential.helper", git.credentialHelper, configScope, cwd);
+  setConfig(
+    "credential.https://github.com.username",
+    username,
+    configScope,
+    cwd,
+  );
 }
 
 export function clearProfile(scope, cwd = process.cwd()) {
@@ -83,6 +92,7 @@ export function clearProfile(scope, cwd = process.cwd()) {
   setConfig("gpg.format", null, configScope, cwd);
   setConfig("commit.gpgsign", null, configScope, cwd);
   setConfig("credential.helper", null, configScope, cwd);
+  setConfig("credential.https://github.com.username", null, configScope, cwd);
 }
 
 function readGithubCredential(cwd) {

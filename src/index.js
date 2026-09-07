@@ -63,6 +63,9 @@ function writeConfigBlock(io, title, values) {
   io.stdout.write(
     `  credential.helper: ${formatValue(values["credential.helper"])}\n`,
   );
+  io.stdout.write(
+    `  github credential user: ${formatValue(values["credential.https://github.com.username"])}\n`,
+  );
 }
 
 function runCurrent(io) {
