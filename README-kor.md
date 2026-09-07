@@ -2,6 +2,8 @@
 
 Switch Git identities and GitHub credentials without logging out.
 
+[English](README.md) [한국어](README-kor.md)
+
 ## 요구 사항
 
 - Node.js 20 이상
