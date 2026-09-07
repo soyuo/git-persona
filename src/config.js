@@ -2,11 +2,11 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-export const configVersion = 1;
+export const VERSION = 1;
 
-export function createEmptyConfig() {
+export function emptyConfig() {
   return {
-    version: configVersion,
+    version: VERSION,
     active: {
       global: null,
       repositories: {},
@@ -15,38 +15,38 @@ export function createEmptyConfig() {
   };
 }
 
-export function getConfigPath(env = process.env) {
+export function configPath(env = process.env) {
   return env.GIT_PERSONA_CONFIG ?? join(homedir(), ".git-persona", "config.json");
 }
 
-function normalizeConfig(config) {
+function normalize(config) {
   return {
-    ...createEmptyConfig(),
+    ...emptyConfig(),
     ...config,
     active: {
-      ...createEmptyConfig().active,
+      ...emptyConfig().active,
       ...config.active,
     },
     profiles: config.profiles ?? {},
   };
 }
 
-export function loadConfig(path = getConfigPath()) {
+export function load(path = configPath()) {
   if (!existsSync(path)) {
-    return createEmptyConfig();
+    return emptyConfig();
   }
 
   try {
     const content = readFileSync(path, "utf8").replace(/^\uFEFF/, "");
 
-    return normalizeConfig(JSON.parse(content));
+    return normalize(JSON.parse(content));
   } catch (error) {
     throw new Error(`Could not read git-persona config at ${path}: ${error.message}`);
   }
 }
 
-export function saveConfig(config, path = getConfigPath()) {
-  const normalized = normalizeConfig(config);
+export function save(config, path = configPath()) {
+  const normalized = normalize(config);
   const directory = dirname(path);
   const temporaryPath = `${path}.tmp`;
 
@@ -58,7 +58,7 @@ export function saveConfig(config, path = getConfigPath()) {
   renameSync(temporaryPath, path);
 }
 
-export function listProfiles(config) {
+export function profiles(config) {
   return Object.values(config.profiles).sort((left, right) =>
     left.id.localeCompare(right.id),
   );

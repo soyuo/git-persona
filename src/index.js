@@ -3,8 +3,8 @@ import { dirname, join } from "node:path";
 import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { getConfigPath, listProfiles, loadConfig, saveConfig } from "./config.js";
-import { applyGitProfile, clearGitProfile, getCurrentGitState } from "./git.js";
+import { configPath, load, profiles as list, save } from "./config.js";
+import { applyProfile, clearProfile, gitState } from "./git.js";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
@@ -69,8 +69,8 @@ function writeConfigBlock(io, title, values) {
 }
 
 function runCurrent(io) {
-  const state = getCurrentGitState();
-  const config = loadConfig();
+  const state = gitState();
+  const config = load();
   const repoId = state.isRepository ? config.active.repositories[state.cwd] ?? null : null;
   const activeId = repoId ?? config.active.global;
 
@@ -172,11 +172,11 @@ function inferProfileName(state, values) {
   return "default";
 }
 
-function createMigrationProfile(profileName, state, values) {
-  const httpsUsername = state.githubCredential.username ?? profileName;
+function migrationProfile(name, state, values) {
+  const httpsUsername = state.githubCredential.username ?? name;
 
   return {
-    id: profileName,
+    id: name,
     git: {
       name: values["user.name"],
       email: values["user.email"],
@@ -225,7 +225,7 @@ async function confirmMigration(io) {
 }
 
 function applyMigration(profileName, profile, options, state) {
-  const config = loadConfig();
+  const config = load();
 
   config.profiles[profileName] = profile;
 
@@ -235,7 +235,7 @@ function applyMigration(profileName, profile, options, state) {
     config.active.global = profileName;
   }
 
-  saveConfig(config);
+  save(config);
 }
 
 async function runMigration(args, io) {
@@ -249,10 +249,10 @@ async function runMigration(args, io) {
     return;
   }
 
-  const state = getCurrentGitState();
+  const state = gitState();
   const values = options.scope === "repo" && state.local ? state.local : state.effective;
   const profileName = options.name ?? inferProfileName(state, values);
-  const profile = createMigrationProfile(profileName, state, values);
+  const profile = migrationProfile(profileName, state, values);
 
   io.stdout.write("Migration preview\n");
   io.stdout.write(`Profile: ${profileName}\n`);
@@ -290,24 +290,24 @@ async function runMigration(args, io) {
   }
 
   io.stdout.write(`Saved persona '${profileName}'.\n`);
-  io.stdout.write(`Config: ${getConfigPath()}\n`);
+  io.stdout.write(`Config: ${configPath()}\n`);
 }
 
 function runList(io) {
   let config;
 
   try {
-    config = loadConfig();
+    config = load();
   } catch (error) {
     io.stderr.write(`git-persona: ${error.message}\n`);
     io.exit(1);
     return;
   }
 
-  const profiles = listProfiles(config);
+  const profiles = list(config);
 
   io.stdout.write("Git personas\n");
-  io.stdout.write(`Config: ${getConfigPath()}\n\n`);
+  io.stdout.write(`Config: ${configPath()}\n\n`);
 
   if (profiles.length === 0) {
     io.stdout.write("No personas saved yet.\n");
@@ -377,7 +377,7 @@ function runRepo(args, io) {
     return;
   }
 
-  const state = getCurrentGitState();
+  const state = gitState();
 
   if (!state.isRepository) {
     io.stderr.write("git-persona: repo commands require a Git repository\n");
@@ -388,7 +388,7 @@ function runRepo(args, io) {
   let config;
 
   try {
-    config = loadConfig();
+    config = load();
   } catch (error) {
     io.stderr.write(`git-persona: ${error.message}\n`);
     io.exit(1);
@@ -405,9 +405,9 @@ function runRepo(args, io) {
     }
 
     try {
-      applyGitProfile(profile, "repo", state.cwd);
+      applyProfile(profile, "repo", state.cwd);
       config.active.repositories[state.cwd] = profile.id;
-      saveConfig(config);
+      save(config);
     } catch (error) {
       io.stderr.write(`git-persona: ${error.message}\n`);
       io.exit(1);
@@ -419,9 +419,9 @@ function runRepo(args, io) {
   }
 
   try {
-    clearGitProfile("repo", state.cwd);
+    clearProfile("repo", state.cwd);
     delete config.active.repositories[state.cwd];
-    saveConfig(config);
+    save(config);
   } catch (error) {
     io.stderr.write(`git-persona: ${error.message}\n`);
     io.exit(1);
@@ -527,18 +527,18 @@ async function runSwitch(args, io) {
     return;
   }
 
-  const state = getCurrentGitState();
+  const state = gitState();
   let config;
 
   try {
-    config = loadConfig();
+    config = load();
   } catch (error) {
     io.stderr.write(`git-persona: ${error.message}\n`);
     io.exit(1);
     return;
   }
 
-  const profiles = listProfiles(config);
+  const profiles = list(config);
 
   if (profiles.length === 0) {
     io.stderr.write("git-persona: no personas saved yet\n");
@@ -579,7 +579,7 @@ async function runSwitch(args, io) {
   }
 
   try {
-    applyGitProfile(profile, options.scope);
+    applyProfile(profile, options.scope);
 
     if (options.scope === "repo") {
       if (!state.isRepository) {
@@ -591,7 +591,7 @@ async function runSwitch(args, io) {
       config.active.global = profile.id;
     }
 
-    saveConfig(config);
+    save(config);
   } catch (error) {
     io.stderr.write(`git-persona: ${error.message}\n`);
     io.exit(1);

@@ -48,7 +48,7 @@ function readConfigValue(key, scope, cwd) {
   return result.stdout || null;
 }
 
-export function writeConfigValue(key, value, scope, cwd = process.cwd()) {
+export function setConfig(key, value, scope, cwd = process.cwd()) {
   const scopeArgs = configScopeArgs(scope);
   const args =
     value === null || value === undefined
@@ -62,27 +62,27 @@ export function writeConfigValue(key, value, scope, cwd = process.cwd()) {
   }
 }
 
-export function applyGitProfile(profile, scope, cwd = process.cwd()) {
+export function applyProfile(profile, scope, cwd = process.cwd()) {
   const configScope = scope === "repo" ? "local" : "global";
   const git = profile.git ?? {};
 
-  writeConfigValue("user.name", git.name, configScope, cwd);
-  writeConfigValue("user.email", git.email, configScope, cwd);
-  writeConfigValue("user.signingkey", git.signingKey, configScope, cwd);
-  writeConfigValue("gpg.format", git.gpgFormat, configScope, cwd);
-  writeConfigValue("commit.gpgsign", git.commitGpgSign, configScope, cwd);
-  writeConfigValue("credential.helper", git.credentialHelper, configScope, cwd);
+  setConfig("user.name", git.name, configScope, cwd);
+  setConfig("user.email", git.email, configScope, cwd);
+  setConfig("user.signingkey", git.signingKey, configScope, cwd);
+  setConfig("gpg.format", git.gpgFormat, configScope, cwd);
+  setConfig("commit.gpgsign", git.commitGpgSign, configScope, cwd);
+  setConfig("credential.helper", git.credentialHelper, configScope, cwd);
 }
 
-export function clearGitProfile(scope, cwd = process.cwd()) {
+export function clearProfile(scope, cwd = process.cwd()) {
   const configScope = scope === "repo" ? "local" : "global";
 
-  writeConfigValue("user.name", null, configScope, cwd);
-  writeConfigValue("user.email", null, configScope, cwd);
-  writeConfigValue("user.signingkey", null, configScope, cwd);
-  writeConfigValue("gpg.format", null, configScope, cwd);
-  writeConfigValue("commit.gpgsign", null, configScope, cwd);
-  writeConfigValue("credential.helper", null, configScope, cwd);
+  setConfig("user.name", null, configScope, cwd);
+  setConfig("user.email", null, configScope, cwd);
+  setConfig("user.signingkey", null, configScope, cwd);
+  setConfig("gpg.format", null, configScope, cwd);
+  setConfig("commit.gpgsign", null, configScope, cwd);
+  setConfig("credential.helper", null, configScope, cwd);
 }
 
 function readGithubCredential(cwd) {
@@ -115,7 +115,7 @@ function readConfigScope(scope, cwd) {
   );
 }
 
-export function getCurrentGitState(cwd = process.cwd()) {
+export function gitState(cwd = process.cwd()) {
   const repoResult = runGit(["rev-parse", "--is-inside-work-tree"], { cwd });
   const isRepository = repoResult.ok && repoResult.stdout === "true";
 
