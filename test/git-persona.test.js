@@ -20,6 +20,8 @@ function env(configPath, globalPath) {
     GIT_PERSONA_CONFIG: configPath,
     GIT_CONFIG_GLOBAL: globalPath,
     GIT_CONFIG_NOSYSTEM: "true",
+    GIT_TERMINAL_PROMPT: "0",
+    GCM_INTERACTIVE: "never",
   };
 }
 
@@ -122,6 +124,29 @@ test("switch global writes only the isolated global config", () => {
 
     assert.equal(git(["config", "--global", "user.email"], state.repo, state.env), "work@example.com");
     assert.equal(git(["config", "--global", "credential.https://github.com.username"], state.repo, state.env), "work");
+  } finally {
+    rmSync(state.dir, { recursive: true, force: true });
+  }
+});
+
+test("switch replaces multiple global credential helpers", () => {
+  const state = setup();
+
+  try {
+    git(["config", "--global", "--add", "credential.helper", "first-helper"], state.repo, state.env);
+    git(["config", "--global", "--add", "credential.helper", "second-helper"], state.repo, state.env);
+    assert.equal(
+      cli(["add", "work", "--credential-helper", "manager"], state.repo, state.env).status,
+      0,
+    );
+
+    const result = cli(["switch", "work"], state.repo, state.env);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(
+      git(["config", "--global", "--get-all", "credential.helper"], state.repo, state.env).split("\n"),
+      ["manager"],
+    );
   } finally {
     rmSync(state.dir, { recursive: true, force: true });
   }

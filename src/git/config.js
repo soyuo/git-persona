@@ -26,7 +26,9 @@ export function setConfig(key, value, scope, cwd = process.cwd()) {
   const args =
     value === null || value === undefined
       ? ["config", ...scopeArgs(scope), "--unset", key]
-      : ["config", ...scopeArgs(scope), key, value];
+      : key === "credential.helper"
+        ? ["config", ...scopeArgs(scope), "--replace-all", key, value]
+        : ["config", ...scopeArgs(scope), key, value];
   const result = runGit(args, { cwd });
 
   if (!result.ok && !(value === null || value === undefined)) {
